@@ -2898,3 +2898,27 @@ Feature importance is strongly supportive of the branch. `SPEI_12_gap_delta` and
 Decision:
 
 > **PROMOTE EXP005 only to dev1/dev2 validation. Keep EXP003 as the incumbent until EXP005 proves a stable mean gain across all three dev folds. Do not revisit the lockbox yet.**
+
+## 2026-09-07 — EXP005 promoted across all three development folds
+
+EXP005 then improved the frozen EXP003 incumbent on both remaining development folds:
+
+| Fold | EXP003 | EXP005 | Incremental gain |
+|---|---:|---:|---:|
+| dev1 | 0.509946 | **0.503824** | +0.006122 |
+| dev2 | 0.571174 | **0.562748** | +0.008425 |
+| dev3 | 0.557687 | **0.553415** | +0.004272 |
+
+The full three-fold EXP005 mean is approximately **0.539996**, versus **0.546269** for EXP003, an improvement of approximately **0.006273 RMSE (~1.15%)**. This is a smaller step than EXP002/EXP003 but is stable across all three folds and materially larger than the killed EXP004 recency-weighting gain.
+
+The per-horizon pattern is consistent with the feature design. The strongest incremental improvements are generally at **h=2-5**, where there is a nonzero interval between the legal TWS anchor and current hydrometeorology. h=1 is nearly unchanged, while dev3 h6-h7 regress slightly. Across folds, `SPEI_12_gap_delta` and `SPEI_06_gap_delta` are the dominant added features, with soil-moisture gap change also useful; `SPEI_01_gap_delta` is consistently negligible.
+
+Decision: **PROMOTE EXP005 as the new development incumbent. Keep the lockbox closed to further tuning.**
+
+## EXP006 — categorical location identity ablation
+
+EXP006 keeps every EXP005 feature and adds exactly one new spatial feature: a categorical `location_id` deterministically derived from the supplied `(lat, lon)` pair. No target information participates in constructing the identifier. Latitude and longitude remain present, making this a strict add-one-feature ablation.
+
+Rationale: the same ~15.7k spatial locations recur throughout the panel and are also present in test. Continuous latitude/longitude force trees to approximate location-specific structure with axis-aligned geographic partitions. A native categorical location feature gives LightGBM a cheap way to learn groups of locations with similar residual response without the compute and implementation cost of the planned EOF/PCA branch.
+
+Evaluation policy: **run EXP006 on dev3 first against EXP005 = 0.553415. Promote only for a material gain; do not touch the lockbox.**

@@ -84,6 +84,8 @@ HYDRO_GAP_FEATURE_COLUMNS = TWS_HISTORY_FEATURE_COLUMNS + [
     "SOIL_MOISTURE_gap_delta",
 ]
 
+LOCATION_CAT_FEATURE_COLUMNS = HYDRO_GAP_FEATURE_COLUMNS + ["location_id"]
+
 
 @dataclass(frozen=True)
 class SampledTrainingRows:
@@ -488,6 +490,59 @@ def build_hydro_gap_feature_matrix(
     values = out.to_numpy(dtype=np.float32)
     if np.isinf(values).any():
         raise AssertionError("Hydrology-gap feature matrix contains infinite values")
+    return out.reset_index(drop=True)
+
+
+def build_location_cat_feature_matrix(
+    ledger: pd.DataFrame,
+    source_features: pd.DataFrame,
+    structural: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build EXP006 = EXP005 plus a target-blind categorical location id.
+
+    The identifier is a deterministic ordinal of the unique `(lat, lon)` pairs in
+    the structural panel, sorted by coordinates. It uses no target information and
+    is stable between training and validation because both use the same global grid.
+    Latitude/longitude remain in the matrix so this is a strict add-one-feature
+    ablation rather than a replacement of the existing spatial representation.
+    """
+    _assert_target_blind(ledger, "ledger")
+    _assert_target_blind(source_features, "source_features")
+    _assert_target_blind(structural, "structural")
+
+    out = build_hydro_gap_feature_matrix(ledger, source_features, structural)
+
+    required = {"lat", "lon"}
+    missing = required.difference(structural.columns)
+    if missing:
+        raise ValueError(f"Missing structural location columns: {sorted(missing)}")
+
+    locations = (
+        structural.loc[:, ["lat", "lon"]]
+        .drop_duplicates()
+        .sort_values(["lat", "lon"], kind="mergesort")
+        .reset_index(drop=True)
+    )
+    locations["location_id"] = np.arange(len(locations), dtype=np.int32)
+
+    left = ledger.loc[:, ["lat", "lon"]].copy()
+    left["_order"] = np.arange(len(left), dtype=np.int64)
+    ids = (
+        left.merge(
+            locations,
+            how="left",
+            on=["lat", "lon"],
+            validate="many_to_one",
+            sort=False,
+        )
+        .sort_values("_order")
+        ["location_id"]
+    )
+    if ids.isna().any():
+        raise AssertionError("Missing location_id for one or more examples")
+
+    out["location_id"] = ids.to_numpy(dtype=np.int32)
+    out = out.loc[:, LOCATION_CAT_FEATURE_COLUMNS]
     return out.reset_index(drop=True)
 
 

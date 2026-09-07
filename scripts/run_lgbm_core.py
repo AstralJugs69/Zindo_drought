@@ -19,6 +19,7 @@ from src.ml_features import (
     CORE_FEATURE_COLUMNS,
     HYDRO_GAP_FEATURE_COLUMNS,
     HYDRO_FEATURE_COLUMNS,
+    LOCATION_CAT_FEATURE_COLUMNS,
     TWS_HISTORY_FEATURE_COLUMNS,
     SOURCE_CORE_COLUMNS,
     SOURCE_HYDRO_COLUMNS,
@@ -26,6 +27,7 @@ from src.ml_features import (
     build_core_feature_matrix,
     build_hydro_gap_feature_matrix,
     build_hydro_feature_matrix,
+    build_location_cat_feature_matrix,
     build_tws_history_feature_matrix,
     build_sampled_training_rows,
     horizon_rebalance_weights,
@@ -90,12 +92,13 @@ def main() -> None:
     parser.add_argument("--early-stopping-rounds", type=int, default=100)
     parser.add_argument(
         "--feature-set",
-        choices=["core", "hydro", "tws_history", "hydro_gap"],
+        choices=["core", "hydro", "tws_history", "hydro_gap", "location_cat"],
         default="core",
         help=(
             "core=EXP001; hydro=EXP002 fresh SPEI+soil; "
             "tws_history=EXP003 adds exact-calendar TWS history behind legal anchor; "
-            "hydro_gap=EXP005 adds current-minus-anchor hydrology deltas"
+            "hydro_gap=EXP005 adds current-minus-anchor hydrology deltas; "
+            "location_cat=EXP006 adds categorical location identity"
         ),
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -127,12 +130,14 @@ def main() -> None:
         feature_builder = lambda ledger, sf: build_core_feature_matrix(ledger, sf)
         experiment_name = "EXP001"
         model_name = "exp001_core_delta_lgbm"
+        categorical_features = []
     elif args.feature_set == "hydro":
         feature_columns = HYDRO_FEATURE_COLUMNS
         source_columns = SOURCE_HYDRO_COLUMNS
         feature_builder = lambda ledger, sf: build_hydro_feature_matrix(ledger, sf)
         experiment_name = "EXP002"
         model_name = "exp002_fresh_hydro_delta_lgbm"
+        categorical_features = []
     elif args.feature_set == "tws_history":
         feature_columns = TWS_HISTORY_FEATURE_COLUMNS
         source_columns = SOURCE_HYDRO_COLUMNS
@@ -141,7 +146,8 @@ def main() -> None:
         )
         experiment_name = "EXP003"
         model_name = "exp003_tws_history_delta_lgbm"
-    else:
+        categorical_features = []
+    elif args.feature_set == "hydro_gap":
         feature_columns = HYDRO_GAP_FEATURE_COLUMNS
         source_columns = SOURCE_HYDRO_HISTORY_COLUMNS
         feature_builder = lambda ledger, sf: build_hydro_gap_feature_matrix(
@@ -149,6 +155,16 @@ def main() -> None:
         )
         experiment_name = "EXP005"
         model_name = "exp005_hydro_gap_delta_lgbm"
+        categorical_features = []
+    else:
+        feature_columns = LOCATION_CAT_FEATURE_COLUMNS
+        source_columns = SOURCE_HYDRO_HISTORY_COLUMNS
+        feature_builder = lambda ledger, sf: build_location_cat_feature_matrix(
+            ledger, sf, structural
+        )
+        experiment_name = "EXP006"
+        model_name = "exp006_location_cat_delta_lgbm"
+        categorical_features = ["location_id"]
 
     source_features = raw.loc[:, source_columns].copy()
     labels = raw.loc[:, ["sample_id", "target"]].copy()
@@ -227,6 +243,7 @@ def main() -> None:
             label=y_train_delta,
             weight=train_weight,
             feature_name=feature_columns,
+            categorical_feature=categorical_features,
             free_raw_data=True,
         )
         valid_set = lgb.Dataset(
@@ -234,6 +251,7 @@ def main() -> None:
             label=y_valid_delta,
             weight=valid_weight,
             feature_name=feature_columns,
+            categorical_feature=categorical_features,
             reference=train_set,
             free_raw_data=True,
         )
