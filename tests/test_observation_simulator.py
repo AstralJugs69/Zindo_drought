@@ -100,7 +100,7 @@ class ObservationSimulatorTests(unittest.TestCase):
     def test_visible_history_features_retain_missing_prior_observations(self) -> None:
         panel = self._panel()
         labels = pd.DataFrame({"sample_id": panel.sample_id, "target": [1.1, 2.1, 3.1, 4.1]})
-        fold = simulate_observations(panel, score_ids=pd.Series(["a", "b"]), labels=labels, scenario=self._scenario())
+        fold = simulate_observations(panel, score_ids=pd.Series(["a", "b", "c"]), labels=labels, scenario=self._scenario())
         source = panel.loc[:, ["sample_id", "time", "lat", "lon"]].copy()
         source["month_sin"] = 0.0
         source["month_cos"] = 1.0
