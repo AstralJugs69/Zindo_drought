@@ -92,6 +92,20 @@ HYDRO_GAP_SAFE_FEATURE_COLUMNS = HYDRO_FEATURE_COLUMNS + [
     "SOIL_MOISTURE_gap_delta",
 ]
 
+# History reconstructed by ``simulate_observations`` rather than by looking up
+# exact calendar lags in a dense truth panel.  These values describe only the
+# two visible observations immediately behind the legal anchor and their real
+# calendar spacing; missing observations remain missing.
+VISIBLE_HISTORY_FEATURE_COLUMNS = HYDRO_GAP_SAFE_FEATURE_COLUMNS + [
+    "previous_visible_TWS",
+    "previous_visible_age_months",
+    "older_visible_TWS",
+    "older_visible_age_months",
+    "previous_visible_spacing_months",
+    "has_previous_visible",
+    "has_older_visible",
+]
+
 LOCATION_CAT_FEATURE_COLUMNS = HYDRO_GAP_FEATURE_COLUMNS + ["location_id"]
 
 EOF_RANK = 8
@@ -603,6 +617,46 @@ def build_hydro_gap_safe_feature_matrix(
     if np.isinf(values).any():
         raise AssertionError("Hydrology-gap-safe feature matrix contains infinite values")
     return out.reset_index(drop=True)
+
+
+def build_visible_history_feature_matrix(
+    ledger: pd.DataFrame,
+    source_features: pd.DataFrame,
+    structural: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build R03 features from the simulator's legal visible-history stream.
+
+    ``structural`` is retained for the common feature-builder API but is not
+    consulted: every state value used here was emitted by the observation
+    simulator from its supplied visibility schedule.  This deliberately avoids
+    falling back to dense exact-month TWS lags when the true Test schedule is
+    sparse.
+    """
+    _assert_target_blind(ledger, "ledger")
+    required = {
+        "last_observed_date", "previous_visible_date", "previous_visible_TWS",
+        "older_visible_date", "older_visible_TWS",
+    }
+    missing = required.difference(ledger.columns)
+    if missing:
+        raise ValueError(f"Ledger lacks simulator visible-history columns: {sorted(missing)}")
+    out = build_hydro_gap_safe_feature_matrix(ledger, source_features, structural)
+    current = pd.to_datetime(ledger["last_observed_date"]).dt.to_period("M")
+    previous = pd.to_datetime(ledger["previous_visible_date"], errors="coerce").dt.to_period("M")
+    older = pd.to_datetime(ledger["older_visible_date"], errors="coerce").dt.to_period("M")
+    out["previous_visible_TWS"] = ledger["previous_visible_TWS"].to_numpy(dtype=np.float32)
+    out["previous_visible_age_months"] = np.asarray(current - previous, dtype="float32")
+    out["older_visible_TWS"] = ledger["older_visible_TWS"].to_numpy(dtype=np.float32)
+    out["older_visible_age_months"] = np.asarray(current - older, dtype="float32")
+    out["previous_visible_spacing_months"] = np.asarray(previous - older, dtype="float32")
+    out["has_previous_visible"] = previous.notna().to_numpy(dtype=np.float32)
+    out["has_older_visible"] = older.notna().to_numpy(dtype=np.float32)
+    values = out.to_numpy(dtype=np.float32)
+    if np.isinf(values).any():
+        raise AssertionError("Visible-history feature matrix contains infinite values")
+    return out.loc[:, VISIBLE_HISTORY_FEATURE_COLUMNS].astype(
+        {c: ("int8" if c == "h" else "float32") for c in VISIBLE_HISTORY_FEATURE_COLUMNS}
+    ).reset_index(drop=True)
 
 
 def build_location_cat_feature_matrix(

@@ -77,7 +77,7 @@ def simulate_observations(
     x["source_date"] = pd.to_datetime(x["time"])
     x["source_period"] = x["source_date"].dt.to_period("M")
     x["_input_order"] = np.arange(len(x), dtype=np.int64)
-    x = x.sort_values(["lat", "lon", "source_date", "_input_order"], kind="mergesort")
+    x = x.sort_values(["lat", "lon", "source_date", "_input_order"], kind="mergesort").reset_index(drop=True)
 
     x["tws_visible"] = x["tws_visible"].astype(bool)
     if x.loc[x["tws_visible"], "TWS_t"].isna().any():
@@ -87,6 +87,31 @@ def simulate_observations(
     groups = x.groupby(["lat", "lon"], sort=False)
     x["last_observed_date"] = groups["_candidate_date"].ffill()
     x["last_observed_TWS"] = groups["_candidate_tws"].ffill()
+
+    # Keep a compact, availability-faithful history behind the current legal
+    # anchor.  The ranks are assigned only to actually visible observations;
+    # hidden source rows never enter this lookup, even if their true TWS is
+    # present in the source panel.  This lets later feature builders use recent
+    # visible-history values/ages without reconstructing state from an
+    # unrestricted truth table.
+    x["_visible_rank"] = groups["tws_visible"].cumsum().astype(np.int64) - 1
+    x["_anchor_rank"] = x["_visible_rank"].where(x["last_observed_date"].notna())
+    visible = x.loc[x["tws_visible"], ["lat", "lon", "_visible_rank", "source_date", "TWS_t"]].copy()
+    visible = visible.rename(columns={"source_date": "_visible_date", "TWS_t": "_visible_tws"})
+    for offset, label in ((1, "previous"), (2, "older")):
+        lookup = visible.rename(columns={
+            "_visible_rank": f"_{label}_rank",
+            "_visible_date": f"{label}_visible_date",
+            "_visible_tws": f"{label}_visible_TWS",
+        })
+        x[f"_{label}_rank"] = x["_anchor_rank"] - offset
+        x = x.merge(
+            lookup,
+            how="left",
+            on=["lat", "lon", f"_{label}_rank"],
+            validate="many_to_one",
+            sort=False,
+        )
 
     score_mask = pd.Series(True, index=x.index)
     if score_ids is not None:
@@ -114,7 +139,9 @@ def simulate_observations(
     scored["scenario_id"] = scenario.scenario_id
     ledger = scored.loc[:, [
         "sample_id", "source_date", "target_date", "source_period", "lat", "lon",
-        "location_id", "tws_visible", "last_observed_date", "last_observed_TWS", "h",
+        "location_id", "tws_visible", "last_observed_date", "last_observed_TWS",
+        "previous_visible_date", "previous_visible_TWS", "older_visible_date",
+        "older_visible_TWS", "h",
         "scenario_id",
     ]].sort_values(["source_date", "lat", "lon"], kind="mergesort").reset_index(drop=True)
 

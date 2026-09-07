@@ -15,8 +15,9 @@ under the corrected multi-scenario protocol.
 
 ## Current rebuild status — 2026-09-07
 
-The active branch is `codex/validation-rebuild` at
-`b3bad826113e7a47350e798ed4dbda197d1bea02`. Kaggle preflight passed with the
+The active branch is `codex/validation-rebuild`; the current local implementation
+extends the verified replay commit `39d4fd7e6302f03ebc0160fcb127c4b837019cd1`
+with the R01--R03 matched-comparison runner and visible-history features. Kaggle preflight passed with the
 attached data hashes recorded in run `preflight_20260907T140625Z`, LightGBM 4.6.0,
 and no package installation. The bootstrap now asserts its remote, branch, clean
 tree, and full commit before any runner starts.
@@ -34,6 +35,19 @@ every historical location, so its calculated horizon differed from the old copie
 template horizon. The correction freezes only each replay's complete-coverage
 locations, reports excluded locations/rows, and retains the equality assertion.
 No leaderboard claim follows from any of these runs.
+
+The corrected complete-coverage R00 run `preflight_20260907T143613Z` completed
+on Kaggle at commit `39d4fd7e6302f03ebc0160fcb127c4b837019cd1`. Its artifact
+package is `/kaggle/working/drought_runs/preflight_20260907T143613Z.zip`
+(14,834,676 bytes; SHA-256 `8d37c97dd6d5094ceb15410b8976e0004032a2261fa7f57f26d9a4abca21a867`).
+The attempted browser download did not appear locally, so this is a verified
+session-local package, not a claimed durable local preservation. Exact-template
+persistence results are: January-2009 replay 0.711328 weighted RMSE (273,200
+rows; 522 locations excluded for incomplete coverage), September-2006 replay
+0.638469 (278,855 rows; 122 excluded), and September-2007 replay 0.625816
+(278,447 rows; 151 excluded). The December-2014--June-2015 confirmation stress
+block remains raw-only at 0.861803 because it naturally spans h=1..13. These are
+baseline diagnostics, not model-selection or leaderboard results.
 
 ---
 
