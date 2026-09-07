@@ -2717,3 +2717,45 @@ For every example, these lags are joined relative to `last_observed_date`, not t
 All other choices remain frozen: same sampled-h training rows, same fresh source-month hydrology, same ΔTWS target, same LightGBM parameters, and same dev folds.
 
 Local dev1 dry-run checks passed with the same 975,657 training rows and 1,958,165 validation examples as EXP002. The EXP003 feature matrix is target-blind and ready for Kaggle training.
+
+## 2026-09-07 — EXP003 dev1 result: causal TWS history strongly promoted
+
+Kaggle completed EXP003 on dev1 with the exact same training rows, validation rows, sampled-h construction, ΔTWS target, fresh hydrology, LightGBM parameters, and protected lockbox policy as EXP002. The only change was the addition of exact-calendar TWS history behind the legal anchor.
+
+Headline result:
+
+| Model | dev1 weighted RMSE | Incremental gain |
+|---|---:|---:|
+| Persistence | 0.628228 | — |
+| EXP001 core ΔTWS | 0.569746 | +0.058482 vs persistence |
+| EXP002 + fresh hydrology | 0.534132 | +0.035614 vs EXP001 |
+| EXP003 + causal TWS history | **0.509946** | **+0.024186 vs EXP002** |
+
+EXP003 improves EXP002 by approximately **4.53%** on dev1 and improves persistence by **0.118282 RMSE (18.83%)**.
+
+Per-horizon EXP003 RMSE:
+
+| h | EXP002 | EXP003 | Incremental gain vs EXP002 |
+|---:|---:|---:|---:|
+| 1 | 0.481311 | **0.461370** | 0.019941 |
+| 2 | 0.540535 | **0.510874** | 0.029661 |
+| 3 | 0.560606 | **0.529941** | 0.030665 |
+| 4 | 0.563263 | **0.536326** | 0.026937 |
+| 5 | 0.565692 | **0.546503** | 0.019189 |
+| 6 | 0.580271 | **0.562770** | 0.017502 |
+| 7 | 0.587726 | **0.573857** | 0.013868 |
+
+The improvement is present at every horizon. Unlike EXP001/EXP002, the *incremental* TWS-history gain is largest around h=2–4 rather than growing monotonically with h, suggesting these features primarily help characterize the pre-anchor local trajectory rather than bridge the entire hidden interval by themselves.
+
+Gain-based feature importance is highly diagnostic. The strongest new features are not the raw lags but the differences relative to the legal anchor:
+
+1. `TWS_anchor_delta1` — 133,003;
+2. `TWS_anchor_delta3` — 127,654;
+3. `TWS_anchor_delta12` — 119,758;
+4. `TWS_anchor_delta6` — 45,235.
+
+The raw historical levels are much weaker. This supports the interpretation that **recent pre-anchor TWS direction / displacement is useful signal beyond the anchor level itself**.
+
+Decision:
+
+> **PROMOTE EXP003 to dev2 and dev3 unchanged. Do not tune LightGBM or add more TWS lags until this exact feature set is confirmed on both remaining development folds.**
