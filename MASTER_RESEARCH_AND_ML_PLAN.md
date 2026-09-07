@@ -3065,6 +3065,19 @@ EXP005 improves the previous frozen incumbent on the recent lockbox, although on
 
 Decision: **freeze EXP005 as Submission #1. Train on every legal supplied training label using the same deterministic sampled-h, target-blind delta formulation and use 118 boosting rounds, taken from the closest-to-test frozen EXP005 lockbox early-stop result. Generate and submit before opening another modeling branch.**
 
+## 2026-09-07 — Submission #1 public leaderboard shock; pause modeling for inference/distribution audit
+
+Submission #1 (`submission_exp005_r118.csv`) scored **0.75789118** on the public leaderboard (rank 258 at the time observed). This is substantially worse than the recent EXP005 lockbox score (**0.682968**) and far from the leading public scores (~0.56-0.62). The gap is too large to treat as ordinary public/private sampling noise.
+
+The official organizer clarification still confirms that `t+1` means the **next calendar month**, so the response is **not** to redefine the target. The immediate priority is to distinguish among:
+
+- true 2016-2018 nonstationarity / extrapolation failure;
+- mismatch between synthetic direct-h folds and the real irregular test calendar;
+- a test-time feature/state construction issue;
+- excessive model corrections relative to the legal TWS persistence state in late test periods.
+
+A zero-training diagnostic (`scripts/audit_submission_shift.py`) was added to compare Submission #1 with exact legal persistence by source month, year, and effective horizon. **No second leaderboard submission should be burned until this audit is inspected.**
+
 ## 2026-09-07 — Submission #1 artifact generated successfully
 
 Kaggle successfully trained the frozen full-data EXP005 model at **118 boosting rounds** and generated the first competition submission artifact:
