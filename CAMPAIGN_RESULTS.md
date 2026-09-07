@@ -36,6 +36,22 @@ chronological capacity selection and the additional recent/transfer checks are
 still pending. The run persisted per-fit OOF CSVs and LightGBM model files in
 the Kaggle output directory; local download durability has not been verified.
 
+## Spatial B1 screen (measured)
+
+The causal B1 projection run `spatial_b1_20260908T041000Z` completed from commit
+`342f84be92cf0a5ebc465149ef9d2522ebd59c2c`. It projected R01 predicted deltas
+onto the prefix-fitted basis at ranks 8 and 16, preserving each legal anchor.
+Coverage was 100% on all folds, but the screen regressed materially:
+
+| Origin | R01 RMSE | B1 rank 8 | B1 rank 16 |
+|---|---:|---:|---:|
+| Sep-2007 | 0.537422 | 0.617560 | 0.606508 |
+| Jan-2009 | 0.574104 | 0.694490 | 0.671714 |
+| Dec-2014 h1–7 | 0.822625 | 0.880291 | 0.867192 |
+
+This is a clean negative B1 result, not a reason to cancel B2; the dynamic
+factor hypothesis remains separately required.
+
 ## Executed evidence
 
 See `NEXT_ACTION.md` for the corrected spatial gate, the paired regional smoke
