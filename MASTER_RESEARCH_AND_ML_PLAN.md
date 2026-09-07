@@ -2864,3 +2864,37 @@ The joins are exact-calendar and location-specific. No interpolation or row shif
 This deliberately tests the smallest useful hidden-interval hydrology signal before attempting richer mean/min/max/trend summaries, which may be unreproducible when intermediate calendar months are absent from the provided panel.
 
 Evaluation policy: **run EXP005 on dev3 first against EXP003 = 0.557687. Do not touch the lockbox. Promote only if the gain is materially larger than EXP004 and is not confined to a single horizon.**
+
+## 2026-09-07 — EXP005 dev3 result: promote to dev1/dev2 validation
+
+Kaggle completed EXP005 on dev3 with the frozen EXP003 recipe plus only the five current-minus-anchor hydrology gap deltas.
+
+```text
+EXP003 dev3 = 0.557687
+EXP005 dev3 = 0.553415
+gain        = +0.004272
+relative    = +0.77%
+best_iter   = 212
+```
+
+This gain is materially larger than the killed EXP004 recency-weighting gain (+0.001114), so the branch is worth validating across the remaining development folds.
+
+Per-horizon behavior versus EXP003 is mixed but diagnostic:
+
+| h | EXP003 | EXP005 | Incremental change |
+|---:|---:|---:|---:|
+| 1 | 0.496829 | 0.497522 | -0.000693 |
+| 2 | 0.558275 | **0.550992** | +0.007283 |
+| 3 | 0.596215 | **0.586466** | +0.009749 |
+| 4 | 0.591669 | **0.581395** | +0.010274 |
+| 5 | 0.594565 | **0.589083** | +0.005482 |
+| 6 | 0.600602 | 0.601945 | -0.001343 |
+| 7 | 0.627126 | 0.632098 | -0.004972 |
+
+The gain is concentrated at h=2-5, which is consistent with the intended interpretation: hydrology change since the legal TWS anchor helps describe the hidden interval. The h=1 near-neutral result is expected because all five gap deltas are exactly zero by construction. The h=6-7 regression means this feature set is not yet safe to promote globally without cross-fold confirmation.
+
+Feature importance is strongly supportive of the branch. `SPEI_12_gap_delta` and `SPEI_06_gap_delta` become the #2 and #5 gain features respectively, and `SOIL_MOISTURE_gap_delta` is also substantial. `SPEI_01_gap_delta` contributes almost nothing. This suggests medium/long hydro-climate accumulation matters more than one-month change.
+
+Decision:
+
+> **PROMOTE EXP005 only to dev1/dev2 validation. Keep EXP003 as the incumbent until EXP005 proves a stable mean gain across all three dev folds. Do not revisit the lockbox yet.**
