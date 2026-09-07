@@ -115,3 +115,11 @@ chronological capacity selection, full OOF/model artifact persistence, and the
 additional recent origin remain pending. The run's regional hashes were shape
 placeholders and are not treated as provenance; the runner has since been
 repaired to hash feature bytes. No Test predictions or submissions were made.
+
+The expanded paired width run completed both 5- and 15-degree blocks
+(`regional_widths_20260908T031000Z`, commit
+`fdee96573583f22cdaf4d17f2b9d58de9bb9a219`). Width-15 C1 raw RMSE was
+`0.529463/0.559609/0.818389` for Sep-2007, Jan-2009 and Dec-2014 h1-7,
+respectively, versus paired C0 `0.537422/0.574104/0.822625`. These remain
+frozen-capacity information comparisons; inner capacity selection and transfer
+evaluation are not yet complete.
