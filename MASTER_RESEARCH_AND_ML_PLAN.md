@@ -3064,3 +3064,24 @@ best_iter           = 118
 EXP005 improves the previous frozen incumbent on the recent lockbox, although only modestly. The late-period absolute difficulty remains materially higher than dev1-dev3, so the hydrologic-gap features are not treated as a solution to the observed nonstationarity. However, after three subsequent negative ablations, continued pre-submission feature screening has lower expected value than obtaining a real leaderboard signal.
 
 Decision: **freeze EXP005 as Submission #1. Train on every legal supplied training label using the same deterministic sampled-h, target-blind delta formulation and use 118 boosting rounds, taken from the closest-to-test frozen EXP005 lockbox early-stop result. Generate and submit before opening another modeling branch.**
+
+## 2026-09-07 — Submission #1 artifact generated successfully
+
+Kaggle successfully trained the frozen full-data EXP005 model at **118 boosting rounds** and generated the first competition submission artifact:
+
+```text
+/kaggle/working/submission_exp005_r118.csv
+```
+
+The final inference pipeline passed its built-in structural checks: exact test horizon counts matched the audited `h=1..7` distribution; test feature rows remained at **280,961**; predictions were finite; every sample-submission ID matched exactly one prediction; and no submission target was missing.
+
+Prediction summary:
+
+```text
+mean = -0.064480
+std  =  0.766452
+min  = -2.869500
+max  =  3.301893
+```
+
+Training used **1,977,029** legal supplied labelled examples and completed in about **25.2 s** on Kaggle CPU. The artifact is **ready to upload but not yet recorded as submitted**. No additional model branch should be opened until the first public-leaderboard score is observed.
