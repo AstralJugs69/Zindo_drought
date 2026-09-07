@@ -52,6 +52,12 @@ Coverage was 100% on all folds, but the screen regressed materially:
 This is a clean negative B1 result, not a reason to cancel B2; the dynamic
 factor hypothesis remains separately required.
 
+The first B2 attempt (`spatial_b2_20260908T050000Z`, commit
+`45ae11f...`) did not produce a manifest: the Kaggle session reset during the
+run. This is recorded as a runtime failure/diagnostic gap, not as a model
+score. The runner now supports a scoped recent-origin smoke retry before the
+full two-rank, three-origin execution.
+
 ## Executed evidence
 
 See `NEXT_ACTION.md` for the corrected spatial gate, the paired regional smoke
