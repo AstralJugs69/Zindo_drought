@@ -5,7 +5,7 @@
 **Competition close:** 2026-09-13  
 **Document role:** Canonical research ledger, modeling blueprint, experiment discipline, leakage specification, compute plan, and living decision record for the entire challenge.  
 **First compiled:** 2026-09-07  
-**Current phase:** Causal validation infrastructure is complete; EXP005 hydrologic-gap LightGBM is the current dev incumbent; the recent lockbox has been opened once for frozen EXP003 only; subsequent tuning remains dev-fold-only.  
+**Current phase:** Causal validation infrastructure is complete; EXP005 hydrologic-gap LightGBM is the current dev incumbent; the recent lockbox has been opened once for frozen EXP003 only; subsequent tuning remains dev-fold-only.
 **Local project path:** `C:\dev\zindi\drought`  
 **Git status at first compilation:** Folder exists, but it is not yet initialized as a Git repository and has no remote configured.
 
