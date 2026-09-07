@@ -20,6 +20,7 @@ from src.ml_features import (
     EOF_FEATURE_COLUMNS,
     EOF_RANK,
     HYDRO_GAP_FEATURE_COLUMNS,
+    HYDRO_GAP_SAFE_FEATURE_COLUMNS,
     HYDRO_FEATURE_COLUMNS,
     LOCATION_CAT_FEATURE_COLUMNS,
     TWS_HISTORY_FEATURE_COLUMNS,
@@ -29,6 +30,7 @@ from src.ml_features import (
     build_core_feature_matrix,
     build_eof_feature_matrix,
     build_hydro_gap_feature_matrix,
+    build_hydro_gap_safe_feature_matrix,
     build_hydro_feature_matrix,
     build_location_cat_feature_matrix,
     build_tws_history_feature_matrix,
@@ -96,12 +98,13 @@ def main() -> None:
     parser.add_argument("--early-stopping-rounds", type=int, default=100)
     parser.add_argument(
         "--feature-set",
-        choices=["core", "hydro", "tws_history", "hydro_gap", "location_cat", "eof"],
+        choices=["core", "hydro", "tws_history", "hydro_gap", "hydro_gap_safe", "location_cat", "eof"],
         default="core",
         help=(
             "core=EXP001; hydro=EXP002 fresh SPEI+soil; "
             "tws_history=EXP003 adds exact-calendar TWS history behind legal anchor; "
             "hydro_gap=EXP005 adds current-minus-anchor hydrology deltas; "
+            "hydro_gap_safe=EXP009 removes fragile TWS-history lags/deltas; "
             "location_cat=EXP006 adds categorical location identity; "
             "eof=EXP007 adds rank-8 fold-causal EOF location loadings"
         ),
@@ -160,6 +163,15 @@ def main() -> None:
         )
         experiment_name = "EXP005"
         model_name = "exp005_hydro_gap_delta_lgbm"
+        categorical_features = []
+    elif args.feature_set == "hydro_gap_safe":
+        feature_columns = HYDRO_GAP_SAFE_FEATURE_COLUMNS
+        source_columns = SOURCE_HYDRO_HISTORY_COLUMNS
+        feature_builder = lambda ledger, sf: build_hydro_gap_safe_feature_matrix(
+            ledger, sf, structural
+        )
+        experiment_name = "EXP009"
+        model_name = "exp009_hydro_gap_safe_delta_lgbm"
         categorical_features = []
     elif args.feature_set == "location_cat":
         feature_columns = LOCATION_CAT_FEATURE_COLUMNS

@@ -84,6 +84,14 @@ HYDRO_GAP_FEATURE_COLUMNS = TWS_HISTORY_FEATURE_COLUMNS + [
     "SOIL_MOISTURE_gap_delta",
 ]
 
+HYDRO_GAP_SAFE_FEATURE_COLUMNS = HYDRO_FEATURE_COLUMNS + [
+    "SPEI_01_gap_delta",
+    "SPEI_03_gap_delta",
+    "SPEI_06_gap_delta",
+    "SPEI_12_gap_delta",
+    "SOIL_MOISTURE_gap_delta",
+]
+
 LOCATION_CAT_FEATURE_COLUMNS = HYDRO_GAP_FEATURE_COLUMNS + ["location_id"]
 
 EOF_RANK = 8
@@ -502,6 +510,98 @@ def build_hydro_gap_feature_matrix(
     values = out.to_numpy(dtype=np.float32)
     if np.isinf(values).any():
         raise AssertionError("Hydrology-gap feature matrix contains infinite values")
+    return out.reset_index(drop=True)
+
+
+def build_hydro_gap_safe_feature_matrix(
+    ledger: pd.DataFrame,
+    source_features: pd.DataFrame,
+    structural: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build EXP009: EXP002 plus source-minus-anchor hydrology deltas only.
+
+    This deliberately excludes all exact-calendar TWS lag/delta features because
+    their availability collapses on the sparse real Test calendar. The retained
+    features are either current source-month covariates or the legal TWS anchor and
+    hydrology at that same legal anchor month, all of which are reproducible at test.
+    """
+    _assert_target_blind(ledger, "ledger")
+    _assert_target_blind(source_features, "source_features")
+    _assert_target_blind(structural, "structural")
+
+    required_ledger = {
+        "sample_id",
+        "last_observed_date",
+        "last_observed_TWS",
+        "h",
+        "lat",
+        "lon",
+    }
+    missing = required_ledger.difference(ledger.columns)
+    if missing:
+        raise ValueError(f"Missing ledger columns: {sorted(missing)}")
+
+    missing_source = set(SOURCE_HYDRO_HISTORY_COLUMNS).difference(source_features.columns)
+    if missing_source:
+        raise ValueError(
+            f"Missing hydrology-history source columns: {sorted(missing_source)}"
+        )
+    if source_features["sample_id"].duplicated().any():
+        raise AssertionError("source_features sample_id must be unique")
+
+    # Start from the always-reproducible EXP002 matrix, not EXP003 history.
+    out = build_hydro_feature_matrix(ledger, source_features)
+
+    lookup = source_features.loc[:, ["time", "lat", "lon", *HYDRO_GAP_VARIABLES]].copy()
+    lookup["anchor_period"] = pd.to_datetime(lookup["time"]).dt.to_period("M")
+    lookup = lookup.drop(columns=["time"])
+    if lookup.duplicated(["lat", "lon", "anchor_period"]).any():
+        raise AssertionError("Hydrology lookup is not unique by location/calendar month")
+    lookup = lookup.rename(columns={v: f"_anchor_{v}" for v in HYDRO_GAP_VARIABLES})
+
+    left = ledger.loc[:, ["last_observed_date", "lat", "lon", "h"]].copy()
+    left["_order"] = np.arange(len(left), dtype=np.int64)
+    left["anchor_period"] = pd.to_datetime(left["last_observed_date"]).dt.to_period("M")
+    anchors = left.merge(
+        lookup,
+        how="left",
+        on=["lat", "lon", "anchor_period"],
+        validate="many_to_one",
+        sort=False,
+    ).sort_values("_order")
+
+    anchor_columns = [f"_anchor_{v}" for v in HYDRO_GAP_VARIABLES]
+    if anchors[anchor_columns].isna().any().any():
+        missing_rows = int(anchors[anchor_columns].isna().any(axis=1).sum())
+        raise AssertionError(
+            f"Missing legal anchor hydrology for {missing_rows} examples"
+        )
+
+    gap_names = {
+        "SPEI_01_t": "SPEI_01_gap_delta",
+        "SPEI_03_t": "SPEI_03_gap_delta",
+        "SPEI_06_t": "SPEI_06_gap_delta",
+        "SPEI_12_t": "SPEI_12_gap_delta",
+        "SOIL_MOISTURE_t": "SOIL_MOISTURE_gap_delta",
+    }
+    for variable, gap_name in gap_names.items():
+        out[gap_name] = (
+            out[variable].to_numpy(dtype=np.float32)
+            - anchors[f"_anchor_{variable}"].to_numpy(dtype=np.float32)
+        )
+
+    h1 = ledger["h"].to_numpy(dtype=np.int8) == 1
+    if h1.any():
+        h1_gaps = out.loc[h1, list(gap_names.values())].to_numpy(dtype=np.float32)
+        if not np.allclose(h1_gaps, 0.0, atol=1e-6, rtol=0.0):
+            raise AssertionError("h=1 hydrology gap deltas must be exactly zero")
+
+    out = out.loc[:, HYDRO_GAP_SAFE_FEATURE_COLUMNS].astype(
+        {c: ("int8" if c == "h" else "float32") for c in HYDRO_GAP_SAFE_FEATURE_COLUMNS}
+    )
+    values = out.to_numpy(dtype=np.float32)
+    if np.isinf(values).any():
+        raise AssertionError("Hydrology-gap-safe feature matrix contains infinite values")
     return out.reset_index(drop=True)
 
 

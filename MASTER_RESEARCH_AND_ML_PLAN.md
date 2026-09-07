@@ -3113,6 +3113,24 @@ max  =  3.301893
 
 Training used **1,977,029** legal supplied labelled examples and completed in about **25.2 s** on Kaggle CPU. The artifact is **ready to upload but not yet recorded as submitted**. No additional model branch should be opened until the first public-leaderboard score is observed.
 
+## 2026-09-07 — TWS-history availability mismatch identified; EXP009 launched
+
+The post-leaderboard availability audit found a major validation-fidelity mismatch in the exact-calendar TWS-history features used by EXP003/005. Historical CV builds these lags from the relatively dense Train calendar, while the real Test contains only 18 sparse source months across 2015-2018.
+
+Key availability rates:
+
+| Domain | lag1 | lag2 | lag3 | lag6 | lag12 | fully available |
+|---|---:|---:|---:|---:|---:|---:|
+| dev3 | 76.5% | 53.0% | 55.1% | 73.1% | 78.6% | 15.8% |
+| lockbox | 81.5% | 62.0% | 55.9% | 72.1% | 56.1% | 19.2% |
+| real Test | **5.5%** | **5.5%** | **5.7%** | 60.7% | 44.5% | **5.5%** |
+
+Moreover, about **16.9% of Test rows have every TWS-history lag/delta missing**, and the 2018-07/11/12 source months have effectively zero lag availability. Because TWS anchor deltas were among the strongest EXP003/005 features, this is large enough to plausibly explain much of the CV-to-leaderboard collapse.
+
+Decision: treat the historical feature-availability mismatch as a real validation defect. Launch **EXP009**, which keeps EXP005's legal anchor, current SPEI/soil, calendar/spatial features, and five current-minus-anchor hydrology gap deltas, but removes all exact-calendar TWS-history lag/delta features. Run dev3 first before any second leaderboard submission.
+
+Because the old direct-h folds themselves expose much denser TWS history than real Test, EXP009 must not be judged only by legacy dev3. Add an **availability-faithful exact replay**: transplant the real Test's 18 source-month offsets and row-level TWS visibility into the latest historical replay; retain the full historical prefix before replay start, but inside the replay window expose only the transplanted Test rows and blank TWS on transplanted masked rows. Build validation features from that restricted state/source panel. Compare EXP005 and EXP009 under this validator before any second leaderboard submission.
+
 ## 2026-09-07 — Shrinkage hypothesis falsified; audit TWS-history availability shift
 
 The fixed-118-round EXP005 shrinkage diagnostic falsified the idea that the poor public score is caused by over-large corrections away from legal TWS persistence. The analytically optimal global correction multipliers were **1.0579 on dev3** and **1.0971 on the already-open lockbox**. In both periods, every coarse `alpha < 1` blend toward persistence worsened RMSE. Most horizon-specific optima were also at or above 1.0. Therefore a conservative persistence blend is not justified for Submission #2.
