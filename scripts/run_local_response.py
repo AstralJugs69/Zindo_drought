@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.run_experiment import _attach_delta, _json, _preflight, _score, _sha256
+from scripts.run_experiment import _attach_delta, _coverage_hash, _json, _preflight, _score, _sha256
 from scripts.run_lgbm_core import DEFAULT_PARAMS
 from src.local_response import LocalResponse, fit_local_response
 from src.ml_features import HYDRO_GAP_SAFE_FEATURE_COLUMNS, SOURCE_CORE_COLUMNS, SOURCE_HYDRO_HISTORY_COLUMNS, build_sampled_training_rows, build_hydro_gap_safe_feature_matrix, horizon_rebalance_weights
@@ -40,9 +40,9 @@ def _config_hash(payload: dict[str, object]) -> str:
 def _git_state(expected_commit: str | None) -> tuple[str, str]:
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip()
-    dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
+    dirty = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip()
     if dirty:
-        raise RuntimeError("Refusing to run from a dirty repository checkout")
+        raise RuntimeError(f"Refusing to run from a dirty repository checkout:\n{dirty}")
     if expected_commit is not None and commit != expected_commit:
         raise RuntimeError(f"Commit mismatch: expected {expected_commit}, got {commit}")
     return commit, branch
@@ -95,6 +95,9 @@ def main():
     manifest: dict[str, object] = {
         "run_id": out.name, "commit": commit, "branch": branch, "config_hash": _config_hash(config),
         "started_at": datetime.now(timezone.utc).isoformat(), "status": "running",
+        "seed": args.seed, "rounds": args.rounds, "alpha": args.alpha,
+        "lightgbm_params": params, "feature_schema": list(HYDRO_GAP_SAFE_FEATURE_COLUMNS),
+        "resolved_config": config,
     }
     _json(out / "manifest.json", manifest)
     console = _Console(out / "console.log")
@@ -109,6 +112,9 @@ def main():
         labels = train[["sample_id", "target"]]
         summaries: list[dict[str, object]] = []
         recent_report: dict[str, object] | None = None
+        training_counts: dict[str, int] = {}
+        scenario_hashes: dict[str, str] = {}
+        coverage_hashes: dict[str, str] = {}
         for origin in ["2007-09", "2009-01", "2014-12"]:
             console.emit("FOLD_START", origin)
             if origin == "2014-12":
@@ -136,6 +142,9 @@ def main():
                 fold = build_template_replay_fold(train, template, start_month=origin, scenario_id=f"replay_{origin}", family="development")
             sampled = build_sampled_training_rows(structural, source[SOURCE_CORE_COLUMNS], max_target_month=pd.Period(origin, "M") - 1)
             rows = sampled.rows
+            training_counts[origin] = len(rows)
+            scenario_hashes[origin] = fold.spec.digest()
+            coverage_hashes[origin] = _coverage_hash(fold.ledger)
             y = _attach_delta(rows, labels)
             w = horizon_rebalance_weights(rows.h)
             x = build_hydro_gap_safe_feature_matrix(rows, source, structural)
@@ -162,8 +171,15 @@ def main():
             _json(out / "metrics.json", {"folds": summaries, "recent_stress": recent_report})
             del x, v, y, w, rows, sampled, local, booster, candidates, fold
             gc.collect()
-        manifest.update(status="completed", elapsed_seconds=time.perf_counter() - started,
-                        completed_at=datetime.now(timezone.utc).isoformat())
+        manifest.update(
+            status="completed",
+            elapsed_seconds=time.perf_counter() - started,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            training_counts=training_counts,
+            scenario_hashes=scenario_hashes,
+            coverage_hashes=coverage_hashes,
+            recent_stress=recent_report,
+        )
         manifest["output_checksums"] = {p.name: _sha256(p) for p in out.iterdir() if p.is_file() and p.name != "manifest.json"}
         console.emit("RUN_COMPLETE", str(out))
     except Exception as exc:
