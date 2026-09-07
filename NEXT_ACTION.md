@@ -16,6 +16,15 @@
   durability remains **unverified/session-local** and no repository copy could
   be made.
 
+- A separate, earlier verified archive was subsequently downloaded and copied
+  into the local repository at
+  `artifacts/local_response_20260907T212420Z.zip`. It is 92,480,263 bytes with
+  SHA-256
+  `7a45c3a919b6a19f0defb58218643b0f912813c15f92d6bb0a28fbdf4bfde830`.
+  The file is locally durable but remains Git-ignored under `artifacts/` and
+  was not committed or pushed. This does not change the newer 220239Z run's
+  session-local durability status.
+
 - Branch: `codex/validation-rebuild`. The completed local-response Kaggle run
   used the clean, pinned source commit
   `34b7e3b132a463fb7d6cdd936ee188bc4f8b049d`; the local branch subsequently
@@ -57,9 +66,8 @@
   packaged output is `/kaggle/working/drought_runs/local_response_20260907T212420Z.zip`
   (92,480,263 bytes; SHA-256
   `7a45c3a919b6a19f0defb58218643b0f912813c15f92d6bb0a28fbdf4bfde830`).
-  The supported Kaggle Output download action was invoked once, but no matching
-  local file appeared in the expected Downloads location; it is therefore not
-  claimed as locally durable.
+  This is the archive copied to the local repository as noted above; the
+  Kaggle source directory itself remains session-local.
 - Ledger correction: R02/R03's observed regressions remain real for their
   exact recipes, but their schedule-training windows all collapsed to the same
   May-2002 origin. They do not isolate realistic observation masking and must
