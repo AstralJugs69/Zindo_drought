@@ -49,6 +49,42 @@ rows; 522 locations excluded for incomplete coverage), September-2006 replay
 block remains raw-only at 0.861803 because it naturally spans h=1..13. These are
 baseline diagnostics, not model-selection or leaderboard results.
 
+### Matched corrected-evaluation experiments
+
+All four model runs below used the same complete-coverage evaluation rows, seed
+`20260907`, LightGBM's retained baseline settings, and frozen 173 rounds. They
+are development results, not independent confirmation or leaderboard evidence.
+
+| Candidate | Jan-2009 exact | Sep-2006 | Sep-2007 | Mean | Decision |
+|---|---:|---:|---:|---:|---|
+| R01 safe delta / legacy h sampler | 0.573954 | 0.545595 | 0.537405 | 0.552318 | current primary development recipe |
+| R02 safe delta / transplanted schedule training | 0.613719 | 0.583597 | 0.573021 | 0.590113 | reject: regression on all origins |
+| R03 R02 plus streamed visible-history features | 0.616904 | 0.600467 | 0.576177 | 0.597849 | reject: regression on all origins |
+| R04 R01 rows / absolute target | 0.573525 | 0.544811 | 0.539309 | 0.552548 | reject: mixed and 0.000230 worse mean |
+
+R01 (`r01_20260907T145404Z`) ran in 242.96 seconds at
+`b1fe4bae1e558a5c52bdb5b74e7ef418423d6fd9`; its package is 24,065,685 bytes,
+SHA-256 `010f0776315732a387924aa7010dc666c04056faed15196338344eb44f28c4ec`.
+R02 (`r02_20260907T150052Z`) ran in 189.85 seconds and is packaged at
+`/kaggle/working/drought_runs/r02_20260907T150052Z.zip` (SHA-256
+`904a28a06476429a2d8c70a265eee3161ea4a6d276bff021c740540b8fd717ba`). R03's
+first attempt failed before fitting because missing prior visible dates were cast
+incorrectly; the bounded fix was locally tested and the retry
+`r03_20260907T151039Z` completed in 191.33 seconds at
+`abc2f7914ca1d93cae7d4b30d423c0902e435df6` (SHA-256
+`f6acc20203c8be7944c24c19bc4f2077b8d5b3760ed69f22671cd3c32beabfda`). R04
+(`r04_20260907T151713Z`) completed in 247.70 seconds at
+`8c6edafb3e829b8d71f4b3cc31d249ad4e2d2aae` (SHA-256
+`f9ecd869e4e9e888252ac74ce83660932a6aba96b3a01f9b83488ea578b0a8b6`). All
+are verified Kaggle-session artifacts; supported browser download attempts did
+not yield matching local files, so none is claimed as locally preserved.
+
+The requested December-2014--June-2015 confirmation candidate is structurally
+infeasible as a Test-mixture outer fold under its real calendar row schedule: it
+has horizons 1--13 rather than 1--7. It remains a raw-only stress diagnostic;
+opening it cannot validate or promote R01. No final Test CSV or Zindi submission
+has been generated from these development results.
+
 ---
 
 ## 0. How this document must be used
