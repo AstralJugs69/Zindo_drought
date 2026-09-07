@@ -5,7 +5,7 @@
 **Competition close:** 2026-09-13  
 **Document role:** Canonical research ledger, modeling blueprint, experiment discipline, leakage specification, compute plan, and living decision record for the entire challenge.  
 **First compiled:** 2026-09-07  
-**Current phase:** Research saturation and causal validation infrastructure completed; first target-blind baseline suite scored on dev1–dev3; lockbox remains untouched; first ML model is next.  
+**Current phase:** Causal validation infrastructure is complete; EXP005 hydrologic-gap LightGBM is the current dev incumbent; the recent lockbox has been opened once for frozen EXP003 only; subsequent tuning remains dev-fold-only.  
 **Local project path:** `C:\dev\zindi\drought`  
 **Git status at first compilation:** Folder exists, but it is not yet initialized as a Git repository and has no remote configured.
 
@@ -2922,6 +2922,53 @@ EXP006 keeps every EXP005 feature and adds exactly one new spatial feature: a ca
 Rationale: the same ~15.7k spatial locations recur throughout the panel and are also present in test. Continuous latitude/longitude force trees to approximate location-specific structure with axis-aligned geographic partitions. A native categorical location feature gives LightGBM a cheap way to learn groups of locations with similar residual response without the compute and implementation cost of the planned EOF/PCA branch.
 
 Evaluation policy: **run EXP006 on dev3 first against EXP005 = 0.553415. Promote only for a material gain; do not touch the lockbox.**
+
+## 2026-09-07 — EXP006 categorical location identity: killed
+
+EXP006 was evaluated on dev3 with every EXP005 feature unchanged plus native categorical `location_id`:
+
+```text
+EXP005 dev3 = 0.553415
+EXP006 dev3 = 0.555320
+change      = -0.001905 (worse)
+best_iter   = 113
+```
+
+`location_id` accumulated nontrivial split/gain importance, but the extra spatial memorization did not improve held-out temporal generalization. This is evidence against exact-location identity as a useful representation for the current pooled booster.
+
+Decision: **KILL EXP006. Do not cross-fold it.**
+
+## 2026-09-07 — EXP007 static causal EOF loadings: killed
+
+EXP007 kept EXP005 unchanged and added eight location-level EOF/PCA loading features. The basis was fitted only on TWS fields whose source months were inside the fold-past training prefix. On dev3, the rank-8 basis used 102 historical monthly fields through 2011-07 and explained approximately **66.0%** of historical spatial TWS variance.
+
+```text
+EXP005 dev3 = 0.553415
+EXP007 dev3 = 0.554025
+change      = -0.000611 (worse)
+best_iter   = 118
+```
+
+Several EOF loadings were used by the tree, but their static spatial information did not translate into lower RMSE. Together with EXP006, this suggests that adding more *static* location encoding to the current booster is low ROI.
+
+Decision: **KILL EXP007 as an add-on feature branch. Preserve EOF/state-space ideas only for a genuinely dynamic low-rank forecasting branch later, not as static tree embeddings.**
+
+## EXP008 — horizon-specialist LightGBMs
+
+EXP008 changes the training formulation while freezing the full EXP005 feature set and the deterministic sampled-h examples. Instead of one pooled model conditioned on `h`, it trains seven independent LightGBMs, one for each effective TWS horizon `h=1..7`, and concatenates their validation predictions before applying the exact test-h weighted RMSE.
+
+This isolates whether the response function differs enough by stale-state age that a single pooled tree is forcing harmful compromises. Even the rare h5-h7 training groups retain tens of thousands of rows, so the specialist models are computationally feasible without changing the existing tree hyperparameters.
+
+Critical controls:
+
+- same EXP005 features;
+- same labels and legal TWS anchors;
+- same deterministic sampled-h assignments;
+- same LightGBM parameters and seed;
+- no lockbox tuning;
+- one model per h, with h constant inside each specialist.
+
+Evaluation policy: **run EXP008 on dev3 first against EXP005 = 0.553415. Promote to dev1/dev2 only if the combined weighted RMSE improves materially and the benefit is not driven by a single tiny horizon.**
 
 ## 2026-09-07 — EXP006 categorical location identity: killed
 
