@@ -4,6 +4,10 @@ import argparse, json, time, subprocess, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from scripts.run_experiment import _attach_delta, _coverage_hash, _json, _preflight, _score
 from scripts.run_lgbm_core import DEFAULT_PARAMS
 from src.ml_features import SOURCE_CORE_COLUMNS, SOURCE_HYDRO_HISTORY_COLUMNS, build_sampled_training_rows, build_hydro_gap_safe_feature_matrix, horizon_rebalance_weights
