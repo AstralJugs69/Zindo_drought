@@ -1,6 +1,6 @@
 """Kaggle-only paired regional-hydrology experiment (no Test predictions)."""
 from __future__ import annotations
-import argparse, json, time, subprocess, sys
+import argparse, hashlib, argparse, json, time, subprocess, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 
@@ -42,12 +42,11 @@ def main() -> None:
         # sampled/ledger indices are keyed by sample_id; preserve exact pairing.
         rmap=rtrain.assign(sample_id=train.sample_id).set_index('sample_id'); rvmap=rvalid.assign(sample_id=train.sample_id).set_index('sample_id')
         addx=rmap.reindex(rows.sample_id).to_numpy(float); addv=rvmap.reindex(fold.ledger.sample_id).to_numpy(float)
-        addx=np.nan_to_num(addx,nan=0.0); addv=np.nan_to_num(addv,nan=0.0); region_hash[origin]=hashlib.sha256(np.ascontiguousarray(addx).tobytes()).hexdigest() if False else str(addx.shape)
+        addx=np.nan_to_num(addx,nan=0.0); addv=np.nan_to_num(addv,nan=0.0); region_hash[origin]=hashlib.sha256(np.ascontiguousarray(addx).tobytes()).hexdigest()
         for candidate, xx, vv in [('C0_frozen173',x0,v0),('C1_regional_frozen173',pd.DataFrame(np.c_[x0.to_numpy(),addx]),pd.DataFrame(np.c_[v0.to_numpy(),addv]))]:
             booster=lgb.train(params,lgb.Dataset(xx,label=y,weight=w),num_boost_round=173); pred=fold.ledger.last_observed_TWS.to_numpy(float)+booster.predict(vv); score,_=_score(candidate,fold,'recent_stress' if origin=='2014-12' else 'development',pred); score.update(origin=origin,training_rows=len(rows),capacity='frozen_173',regional_width=5.0); results.append(score); booster.free_dataset()
     _json(out/'metrics.json',{'results':results,'capacity_note':'paired frozen-173 smoke/comparison; inner capacity selection deferred','region_hash':region_hash})
     _json(out/'manifest.json',{'status':'completed','commit':head,'branch':'codex/validation-rebuild','elapsed_seconds':time.perf_counter()-started,'candidates':['C0_frozen173','C1_regional_frozen173'],'no_test_predictions':True,'regional_block':'5-degree contemporaneous means, deviations, presence flags','capacity_selection':'deferred after paired smoke'})
     print(json.dumps({'status':'completed','rows':len(results),'output_dir':str(out)}))
 if __name__=='__main__':
-    import hashlib
     main()

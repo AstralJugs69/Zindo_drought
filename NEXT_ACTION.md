@@ -98,3 +98,20 @@ eligible; no Test predictions were produced.
 
 The repaired Phase A artifact remains Kaggle-session-local and was not
 downloaded.
+
+# 2026-09-08 Regional hydrology smoke checkpoint
+
+The paired Kaggle smoke run completed successfully from commit
+`3a8cb5b96f243d6b4c88eb9f0cb10081aac2e13c` at
+`/kaggle/working/drought_runs/regional_capacity_20260908T021000Z`. It used the
+same sampled rows, labels, weights and frozen 173-round LightGBM capacity for
+C0 (R01 features) and C1 (5-degree contemporaneous regional means, local-minus-
+regional deviations and presence flags). Raw/weighted RMSE was C0/C1:
+Sep-2007 `0.537422/0.530604` (`0.537405/0.530589` weighted), Jan-2009
+`0.574104/0.563443` (`0.573954/0.563318`), and Dec-2014 h1-7
+`0.822625/0.818479` (`0.803957/0.801413`). This is encouraging paired smoke
+evidence, not completion of the prescribed stage: width-15 features, inner
+chronological capacity selection, full OOF/model artifact persistence, and the
+additional recent origin remain pending. The run's regional hashes were shape
+placeholders and are not treated as provenance; the runner has since been
+repaired to hash feature bytes. No Test predictions or submissions were made.
