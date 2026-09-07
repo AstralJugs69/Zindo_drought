@@ -58,8 +58,8 @@ are development results, not independent confirmation or leaderboard evidence.
 | Candidate | Jan-2009 exact | Sep-2006 | Sep-2007 | Mean | Decision |
 |---|---:|---:|---:|---:|---|
 | R01 safe delta / legacy h sampler | 0.573954 | 0.545595 | 0.537405 | 0.552318 | current primary development recipe |
-| R02 safe delta / transplanted schedule training | 0.613719 | 0.583597 | 0.573021 | 0.590113 | reject: regression on all origins |
-| R03 R02 plus streamed visible-history features | 0.616904 | 0.600467 | 0.576177 | 0.597849 | reject: regression on all origins |
+| R02 safe delta / transplanted schedule training | 0.613719 | 0.583597 | 0.573021 | 0.590113 | observed regression; confounded by one May-2002 training origin |
+| R03 R02 plus streamed visible-history features | 0.616904 | 0.600467 | 0.576177 | 0.597849 | observed regression; inherits the same May-2002-origin confound |
 | R04 R01 rows / absolute target | 0.573525 | 0.544811 | 0.539309 | 0.552548 | reject: mixed and 0.000230 worse mean |
 
 R01 (`r01_20260907T145404Z`) ran in 242.96 seconds at
@@ -79,11 +79,56 @@ incorrectly; the bounded fix was locally tested and the retry
 are verified Kaggle-session artifacts; supported browser download attempts did
 not yield matching local files, so none is claimed as locally preserved.
 
-The requested December-2014--June-2015 confirmation candidate is structurally
-infeasible as a Test-mixture outer fold under its real calendar row schedule: it
-has horizons 1--13 rather than 1--7. It remains a raw-only stress diagnostic;
-opening it cannot validate or promote R01. No final Test CSV or Zindi submission
-has been generated from these development results.
+The R02/R03 scores are real for their named recipes, but later inspection found
+that `_scenario_training_rows` selected the same May-2002 window for every
+evaluated cutoff. Thus they do not isolate the effect of realistic observation
+masking from substantially older and sparser training coverage. Their broad
+"masking-aware training is rejected" conclusion is withdrawn; rerunning the
+unchanged confounded recipes is not useful.
+
+### Fixed local-response comparison and usable recent stress check
+
+Kaggle run `local_response_20260907T212420Z` completed in 358.909 seconds at
+clean source commit `34b7e3b132a463fb7d6cdd936ee188bc4f8b049d`. It fixed the
+seed (`20260907`), LightGBM rounds (173), local shrinkage alpha (30), candidates,
+and 50/50 blend before scoring. All learned candidates used identical deterministic
+sampled rows: 851,033 at Sep-2007, 1,100,055 at Jan-2009, and 1,827,255 at
+Dec-2014. No early stopping, retuning, Test prediction, or submission was used.
+
+| Candidate | Sep-2007 raw RMSE | Jan-2009 raw RMSE | Dec-2014 h=1..7 raw RMSE |
+|---|---:|---:|---:|
+| Persistence | 0.625852 | 0.711862 | 0.861437 |
+| R01 LightGBM | 0.537422 | 0.574104 | 0.822625 |
+| Global linear response | 0.540809 | 0.587308 | **0.807727** |
+| Local response (alpha=30) | 0.553143 | 0.585955 | 0.843479 |
+| Fixed 50/50 local/R01 blend | **0.531417** | **0.567633** | 0.823734 |
+
+The December-2014--June-2015 block was pre-sliced by availability, before model
+scores, to 109,349 h=1..7 rows; it is a **recent stress check**, not an untouched
+outer confirmation. The excluded 90-row h>7 tail is reported separately (h8=46,
+h9=21, h10=8, h11=5, h12=5, h13=5); tail persistence raw RMSE is 1.228637,
+MAE 0.914803, and bias -0.537166. Full-block persistence raw RMSE is 0.861803
+over 109,439 rows.
+
+Localization did not improve over the global response model, and the fixed blend
+missed R01 by 0.001109 raw RMSE on recent stress despite older-replay gains of
+0.006005 (Sep-2007) and 0.006471 (Jan-2009). It therefore fails the predeclared
+practical screen and is not promoted. The global linear result is a development
+hypothesis only: it gains 0.014898 on recent stress while regressing on both older
+replays, so it is not selected or independently confirmed.
+
+The live run directory contains the resolved config, manifest, flushed log, three
+LightGBM models, three NPZ local models, fifteen OOF files, and the h>7 tail:
+`/kaggle/working/drought_runs/local_response_20260907T212420Z/`. Its package is
+`/kaggle/working/drought_runs/local_response_20260907T212420Z.zip` (92,480,263
+bytes; SHA-256 `7a45c3a919b6a19f0defb58218643b0f912813c15f92d6bb0a28fbdf4bfde830`).
+The supported Kaggle Output download action was attempted once but no matching
+local file appeared, so it remains a verified session-local artifact rather than
+a claimed local preservation. The notebook draft had a Kaggle concurrency-save
+conflict after execution; that did not alter the completed live-run files.
+
+No final Test CSV or Zindi submission has been generated from these development
+and stress results.
 
 ---
 
