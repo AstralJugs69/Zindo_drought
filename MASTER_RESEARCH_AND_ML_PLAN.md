@@ -2123,6 +2123,57 @@ At that point append:
 
 ---
 
+# 31. 2026-09-07 — Historical mask simulator implementation checkpoint
+
+The first exact historical replay of the real test mask geometry has now been implemented and audited.
+
+### Implemented invariants
+
+- the real test row-level effective horizon `h` is derived first from the legal test visibility ledger;
+- historical replay shifts the **actual row-level legal horizon**, not merely the Boolean mask flag;
+- for a historical source month `t` and transplanted horizon `h`, the only legal TWS anchor is joined from exact calendar month `t + 1 - h`;
+- hidden validation `TWS_t` is never used as the anchor when `h>1`;
+- `target` is returned in a separate label table and is absent from the availability/feature ledger;
+- mutating every simulated hidden validation `TWS_t` to extreme random values leaves `last_observed_date`, `last_observed_TWS`, and `h` unchanged;
+- the historical replay preserves exact horizon range `1..7` and a horizon-share mix within 0.002 absolute share of the real test distribution.
+
+### Latest exact calendar replay available in Train
+
+The test contains 18 source months at relative offsets:
+
+```text
+[0, 4, 5, 6, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 34, 38, 39]
+```
+
+There are 62 historical start months for which all 18 shifted source-month slots exist in Train.
+
+The latest exact shifted start is:
+
+```text
+2009-01
+```
+
+and its final source month is:
+
+```text
+2012-04
+```
+
+This limitation is caused by the real missing-month structure of later GRACE training data.
+
+### Consequence for model selection
+
+> **The exact test-calendar replay is a high-fidelity causality/geometry fold, but it must not become the only CV selector because it ends in 2012 and would underweight late-period nonstationarity.**
+
+The later validation layer must therefore contain two complementary modes:
+
+1. **Exact historical template folds** where the complete test calendar pattern can be shifted without invention. These are the highest-fidelity tests of mask/availability logic.
+2. **Recent direct-horizon folds** that keep source-month exogenous variables at the recent validation date while selecting exact legal anchor month `t+1-h` for sampled/test-weighted `h`. These folds will evaluate 2012–2015 nonstationarity without fabricating missing TWS observations.
+
+The two modes must share the same target-blind feature builder and exact calendar anchor joins.
+
+---
+
 # 31. Development log
 
 ## 2026-09-07 — Calendar-safe dataset audit implemented
