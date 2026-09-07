@@ -69,3 +69,18 @@
   with a training-coverage table before fitting. Keep the local-response branch
   frozen unless a separately authorized experiment tests a new causal
   formulation; do not tune alpha, blend weight, or generate a submission.
+# 2026-09-08 Spatial Phase A checkpoint
+
+Implemented and executed `scripts/run_spatial_phase_a.py` in Kaggle from commit
+`08c7e95022ea3caffa7472257f3f3a8a5581589aa0`. The run completed successfully at
+`/kaggle/working/drought_runs/spatial_phase_a_20260908T000000Z` with 12 clearly
+labelled `ORACLE_DIAGNOSTIC` projections and no Test predictions.
+
+Training-prefix-only TWS anomaly basis residual-SSE fractions (ranks 4/8/16/32)
+were: Sep-2007 `0.02045/0.03233/0.06358/0.09058`; Jan-2009
+`0.01564/0.03008/0.03926/0.05277`; Dec-2014 h1-7 `0.04831/0.05924/0.08648/0.11148`.
+Rank <=16 is below the directive's ~10% opportunity gate on all three origins;
+stop the shared-spatial branch without B1/B2. These are hindsight residual
+projections for opportunity screening, not deployable forecast skill.
+
+The Phase A artifact remains Kaggle-session-local and was not downloaded.
