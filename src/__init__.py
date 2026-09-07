@@ -1,0 +1,1 @@
+"""Core drought challenge code."""

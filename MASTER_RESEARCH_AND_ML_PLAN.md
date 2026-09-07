@@ -2120,3 +2120,60 @@ At that point append:
 - leakage-test results;
 - any discrepancy between expected and observed horizon counts;
 - first accepted/rejected feature hypotheses.
+
+---
+
+# 31. Development log
+
+## 2026-09-07 — Calendar-safe dataset audit implemented
+
+Implemented `scripts/audit_dataset.py` and reproduced the audit locally and on Kaggle.
+
+Verified:
+
+- train rows = 2,154,021;
+- test rows = 280,961;
+- unique locations = 15,715 in both train and test;
+- train source months = 138;
+- test source months = 18;
+- `target(t) == TWS(t+1 calendar month)` exactly for 1,977,398 matched pairs;
+- max target-identity absolute error = 0;
+- test masked rows = 186,913;
+- test masked share = 0.6652631504;
+- `TWS_t_masked` matches `TWS_t` missingness exactly.
+
+Status: **PASS**.
+
+## 2026-09-07 — Causal TWS availability ledger implemented
+
+Implemented `src/availability.py` and `scripts/audit_horizons.py`.
+
+The ledger records, for every test row:
+
+- whether same-month TWS is legally visible;
+- last legally observed TWS timestamp;
+- last legally observed TWS value;
+- next-calendar-month target timestamp;
+- effective horizon `h`.
+
+Exact verified test horizon distribution:
+
+| h | rows | share |
+|---:|---:|---:|
+| 1 | 94,048 | 0.334737 |
+| 2 | 62,576 | 0.222721 |
+| 3 | 46,777 | 0.166489 |
+| 4 | 31,076 | 0.110606 |
+| 5 | 15,560 | 0.055381 |
+| 6 | 15,479 | 0.055093 |
+| 7 | 15,445 | 0.054972 |
+
+Weighted mean horizon = **2.7143411363**.
+
+Additional causality assertion:
+
+```text
+masked rows using same-month hidden TWS = 0
+```
+
+Status: **PASS locally; pending Kaggle reproduction at time of this update**.
