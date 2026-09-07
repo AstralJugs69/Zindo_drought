@@ -3037,3 +3037,30 @@ Implementation details:
 Rationale: EXP006 showed that exact location memorization is not helpful, but that does not falsify spatial structure. EOF loadings provide a smooth low-dimensional description of locations that historically co-move in TWS and should be much less prone to identity overfit than a 15.7k-level categorical feature.
 
 Evaluation policy: **run EXP007 on dev3 first against EXP005 = 0.553415. Do not revisit the lockbox. Promote only for a clear gain; otherwise stop adding static spatial encodings and move to the next temporal/training-formulation experiment.**
+
+## 2026-09-07 — EXP006/007/008 killed; EXP005 frozen for Submission #1
+
+Three controlled follow-up branches failed to improve the promoted EXP005 dev3 score of **0.553415**:
+
+| Experiment | Change | dev3 RMSE | Decision |
+|---|---|---:|---|
+| EXP006 | categorical exact `location_id` | 0.555320 | kill |
+| EXP007 | eight fold-causal EOF spatial loadings | 0.554025 | kill |
+| EXP008 | seven separate horizon-specialist LightGBMs | 0.554486 | kill |
+
+The two static spatial encodings both failed despite receiving nontrivial tree gain importance, so static location memorization and static EOF coordinates are no longer priority branches. Horizon specialists also failed; pooled training remains valuable, especially at h=5-7 where specialist training rows are much scarcer.
+
+The already-promoted EXP005 recipe was then frozen and evaluated once on the recent 2013-11 -> 2015-08 lockbox as a final-candidate checkpoint:
+
+```text
+persistence = 0.823804
+EXP003      = 0.685193   (previous frozen lockbox result)
+EXP005      = 0.682968
+gain vs persistence = +0.140836 (+17.10%)
+gain vs EXP003      = +0.002225 (~0.32%)
+best_iter           = 118
+```
+
+EXP005 improves the previous frozen incumbent on the recent lockbox, although only modestly. The late-period absolute difficulty remains materially higher than dev1-dev3, so the hydrologic-gap features are not treated as a solution to the observed nonstationarity. However, after three subsequent negative ablations, continued pre-submission feature screening has lower expected value than obtaining a real leaderboard signal.
+
+Decision: **freeze EXP005 as Submission #1. Train on every legal supplied training label using the same deterministic sampled-h, target-blind delta formulation and use 118 boosting rounds, taken from the closest-to-test frozen EXP005 lockbox early-stop result. Generate and submit before opening another modeling branch.**
