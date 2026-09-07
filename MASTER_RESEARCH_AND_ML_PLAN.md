@@ -3119,6 +3119,43 @@ max  =  3.301893
 
 Training used **1,977,029** legal supplied labelled examples and completed in about **25.2 s** on Kaggle CPU. The artifact is **ready to upload but not yet recorded as submitted**. No additional model branch should be opened until the first public-leaderboard score is observed.
 
+## 2026-09-07 — availability-faithful replay selects EXP009 / EXP010 for Submission #2
+
+The newly added availability-faithful historical replay reproduces the real Test feature-availability pattern by keeping a full historical prefix, transplanting the actual 18 Test source-month offsets, and blanking TWS on transplanted masked rows. Under this validator, TWS-history availability closely matches real Test (`lag1≈0.0556`, `lag2≈0.0554`, `lag3≈0.0566`, `lag6≈0.6062`, `lag12≈0.4443`, all lags≈0.0551).
+
+Scores on the latest replay (2009-01 -> 2012-04):
+
+```text
+persistence = 0.714536
+EXP005      = 0.583334  (best_iter=183)
+EXP009      = 0.577198  (best_iter=173)
+```
+
+EXP009 removes all fragile exact-calendar TWS lag/delta features while retaining the legal anchor, current hydrology, and current-minus-anchor hydrology deltas. It improves EXP005 by **0.006136 RMSE (~1.05%)** on the fidelity-corrected replay.
+
+The horizon split is structured rather than noisy: EXP005 remains better at h1-h2, while EXP009 is better at every h3-h7. A deterministic hybrid using EXP005 for h<=2 and EXP009 for h>=3 has an implied replay RMSE of approximately **0.570509**, outperforming both pure candidates.
+
+The full-data Submission #2 pipeline also fixes a separate Submission #1 reproducibility bug: Train IDs were previously namespaced *before* deterministic horizon hashing, changing sampled-h assignments versus development. The new pipeline samples horizons from the original Train IDs and namespaces only where needed for feature joins.
+
+Kaggle generated:
+
+```text
+/kaggle/working/submission_exp009_r173.csv
+/kaggle/working/submission_exp010_hybrid.csv
+```
+
+Full-data prediction diagnostics:
+
+```text
+EXP005 r183: mean=-0.057780 std=0.761096 min=-2.798278 max=3.400139
+EXP009 r173: mean=-0.034681 std=0.697586 min=-2.675505 max=3.156999
+EXP010 hybrid: mean=-0.044780 std=0.731499 min=-2.798278 max=3.281754
+mean |EXP009-EXP005| = 0.118161
+corr(EXP009,EXP005) = 0.981003
+```
+
+Decision: **submit EXP010 hybrid first as Submission #2. Preserve pure EXP009 as a diagnostic fallback and do not submit it until the EXP010 public score is observed.**
+
 ## 2026-09-07 — TWS-history availability mismatch identified; EXP009 launched
 
 The post-leaderboard availability audit found a major validation-fidelity mismatch in the exact-calendar TWS-history features used by EXP003/005. Historical CV builds these lags from the relatively dense Train calendar, while the real Test contains only 18 sparse source months across 2015-2018.
