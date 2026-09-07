@@ -3112,3 +3112,11 @@ max  =  3.301893
 ```
 
 Training used **1,977,029** legal supplied labelled examples and completed in about **25.2 s** on Kaggle CPU. The artifact is **ready to upload but not yet recorded as submitted**. No additional model branch should be opened until the first public-leaderboard score is observed.
+
+## 2026-09-07 — Shrinkage hypothesis falsified; audit TWS-history availability shift
+
+The fixed-118-round EXP005 shrinkage diagnostic falsified the idea that the poor public score is caused by over-large corrections away from legal TWS persistence. The analytically optimal global correction multipliers were **1.0579 on dev3** and **1.0971 on the already-open lockbox**. In both periods, every coarse `alpha < 1` blend toward persistence worsened RMSE. Most horizon-specific optima were also at or above 1.0. Therefore a conservative persistence blend is not justified for Submission #2.
+
+While tracing inference behavior, a more structural train/test mismatch was identified. EXP003/EXP005 use exact-calendar TWS history features behind the legal anchor (`lag1/2/3/6/12` and anchor deltas). During dev3/lockbox construction these history joins search the full historical Train panel. In the real Test period, however, only **18 sparse source months** exist between 2015-09 and 2018-12. A calendar month that is absent from Test cannot supply a TWS lag, and a present-but-masked Test row supplies NaN. Thus the strongest EXP003/005 features may have a much higher missingness rate at inference than in historical CV.
+
+This is potentially a validation-fidelity issue, not merely generic nonstationarity. Before designing Submission #2, run a no-training audit comparing the availability rates of the TWS-history features in dev3, lockbox, and the exact real Test feature matrix, including breakdowns by source month and horizon. If the availability gap is large, the next model must either simulate the sparse Test calendar during training or remove/reformulate the affected TWS-history features before any further leaderboard use.
