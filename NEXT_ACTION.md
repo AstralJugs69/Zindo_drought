@@ -77,18 +77,24 @@
   with a training-coverage table before fitting. Keep the local-response branch
   frozen unless a separately authorized experiment tests a new causal
   formulation; do not tune alpha, blend weight, or generate a submission.
-# 2026-09-08 Spatial Phase A checkpoint
+# 2026-09-08 Spatial Phase A checkpoint (corrected)
 
-Implemented and executed `scripts/run_spatial_phase_a.py` in Kaggle from commit
-`08c7e95022ea3caffa7472257f3f3a8a5581589aa0`. The run completed successfully at
-`/kaggle/working/drought_runs/spatial_phase_a_20260908T000000Z` with 12 clearly
-labelled `ORACLE_DIAGNOSTIC` projections and no Test predictions.
+The earlier pooled Phase A negative conclusion is **retracted**. It used a
+bugged denominator that summed repeated per-rank/per-date supported SSE. The
+repaired Kaggle run used commit `0f406fa058e0d7553a8c11796a365edd22e612cb` at
+`/kaggle/working/drought_runs/spatial_phase_a_repaired_20260908T013000Z`.
+It computes the finite OOF residual SSE once per origin, including unsupported
+rows, and reports requested/actual basis rank separately. Synthetic regression
+tests cover denominator invariance and rank provenance.
 
-Training-prefix-only TWS anomaly basis residual-SSE fractions (ranks 4/8/16/32)
-were: Sep-2007 `0.02045/0.03233/0.06358/0.09058`; Jan-2009
-`0.01564/0.03008/0.03926/0.05277`; Dec-2014 h1-7 `0.04831/0.05924/0.08648/0.11148`.
-Rank <=16 is below the directive's ~10% opportunity gate on all three origins;
-stop the shared-spatial branch without B1/B2. These are hindsight residual
-projections for opportunity screening, not deployable forecast skill.
+Corrected all-finite opportunity fractions (ranks 4/8/16/32) are: Sep-2007
+`0.07212/0.11801/0.21368/0.33246`; Jan-2009
+`0.06167/0.13130/0.21886/0.31247`; Dec-2014 h1-7
+`0.11902/0.20431/0.29569/0.40116`. Supported and all-finite fractions now
+match because the basis covers every scored location in these folds. These are
+`ORACLE_DIAGNOSTIC` hindsight residual projections, not deployable forecast
+skill. The spatial forecast stage and independent regional stage remain
+eligible; no Test predictions were produced.
 
-The Phase A artifact remains Kaggle-session-local and was not downloaded.
+The repaired Phase A artifact remains Kaggle-session-local and was not
+downloaded.
