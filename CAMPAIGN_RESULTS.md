@@ -58,6 +58,11 @@ run. This is recorded as a runtime failure/diagnostic gap, not as a model
 score. The runner now supports a scoped recent-origin smoke retry before the
 full two-rank, three-origin execution.
 
+The subsequent retry was not started because the reopened Kaggle notebook
+remained in `Draft Session Starting` with execution controls disabled. This is a
+separate infrastructure-state blocker; no claim is made about B2 predictive
+performance.
+
 ## Executed evidence
 
 See `NEXT_ACTION.md` for the corrected spatial gate, the paired regional smoke
