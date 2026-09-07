@@ -3065,6 +3065,20 @@ EXP005 improves the previous frozen incumbent on the recent lockbox, although on
 
 Decision: **freeze EXP005 as Submission #1. Train on every legal supplied training label using the same deterministic sampled-h, target-blind delta formulation and use 118 boosting rounds, taken from the closest-to-test frozen EXP005 lockbox early-stop result. Generate and submit before opening another modeling branch.**
 
+## 2026-09-07 — Submission #1 public LB failure and correction-shrink diagnostic
+
+Submission #1 (`submission_exp005_r118.csv`) scored **0.75789118** on the public leaderboard (rank 258 at submission time), far worse than the internal development mean (~0.540) and recent lockbox (0.683). This gap is too large to attribute to ordinary leaderboard noise and is treated as evidence that the final test distribution is materially harder/different than the historical validators.
+
+A zero-training audit of the submitted predictions against exact legal TWS persistence found that the magnitude of EXP005's correction grows sharply with stale-state horizon and is largest in the long masked 2017 sequence. Across the full test, mean absolute correction is ~0.272. By horizon it rises from ~0.170 at h1 to ~0.445 at h7; the h7 correction also has a +0.134 mean shift. By year, 2017 has mean absolute correction ~0.369 versus ~0.195 in 2015 and ~0.168 in 2018.
+
+This does not prove the corrections are wrong, but it provides a specific failure hypothesis: **EXP005 may be over-correcting stale anchors under the most out-of-distribution late-test regimes.** Before using another leaderboard slot or adding a new model family, evaluate a shrinkage transform
+
+```text
+prediction(alpha) = persistence + alpha * (EXP005 - persistence)
+```
+
+on dev3 and the already-open lockbox using the same frozen 118-round EXP005 recipe. Report both the analytically optimal global alpha and per-horizon alphas, plus a coarse alpha grid. A stable `alpha < 1` across both historical validators would justify a conservative Submission #2 blend; if alpha remains near 1, stop pursuing simple shrinkage and move to a genuinely new late-period/state-assimilation branch.
+
 ## 2026-09-07 — Submission #1 public leaderboard shock; pause modeling for inference/distribution audit
 
 Submission #1 (`submission_exp005_r118.csv`) scored **0.75789118** on the public leaderboard (rank 258 at the time observed). This is substantially worse than the recent EXP005 lockbox score (**0.682968**) and far from the leading public scores (~0.56-0.62). The gap is too large to treat as ordinary public/private sampling noise.
