@@ -9,6 +9,7 @@ import pandas as pd
 from src.observation_simulator import ScenarioSpec, conservative_training_cutoff, simulate_observations
 from src.metrics import TEST_H_COUNTS, score_by_horizon
 from src.validation import build_test_mask_template
+from src.ml_features import build_visible_history_feature_matrix
 
 
 class ObservationSimulatorTests(unittest.TestCase):
@@ -78,7 +79,7 @@ class ObservationSimulatorTests(unittest.TestCase):
     def test_h1_uses_current_visible_state_and_cutoff_is_strict(self) -> None:
         panel = self._panel()
         labels = pd.DataFrame({"sample_id": panel.sample_id, "target": [1.1, 2.1, 3.1, 4.1]})
-        fold = simulate_observations(panel, score_ids=pd.Series(["a", "b"]), labels=labels, scenario=self._scenario())
+        fold = simulate_observations(panel, score_ids=pd.Series(["a", "b", "c"]), labels=labels, scenario=self._scenario())
         h1 = fold.ledger.loc[fold.ledger.sample_id == "a"].iloc[0]
         h2 = fold.ledger.loc[fold.ledger.sample_id == "b"].iloc[0]
         self.assertEqual(int(h1.h), 1)
@@ -95,6 +96,19 @@ class ObservationSimulatorTests(unittest.TestCase):
         expected = np.sqrt(sum(TEST_H_COUNTS[h] / sum(TEST_H_COUNTS.values()) * h * h for h in range(1, 8)))
         self.assertAlmostEqual(score, expected)
         self.assertEqual(details["rows"].tolist(), [1] * 7)
+
+    def test_visible_history_features_retain_missing_prior_observations(self) -> None:
+        panel = self._panel()
+        labels = pd.DataFrame({"sample_id": panel.sample_id, "target": [1.1, 2.1, 3.1, 4.1]})
+        fold = simulate_observations(panel, score_ids=pd.Series(["a", "b"]), labels=labels, scenario=self._scenario())
+        source = panel.loc[:, ["sample_id", "time", "lat", "lon"]].copy()
+        source["month_sin"] = 0.0
+        source["month_cos"] = 1.0
+        for name in ["SPEI_01_t", "SPEI_03_t", "SPEI_06_t", "SPEI_12_t", "SOIL_MOISTURE_t"]:
+            source[name] = 0.0
+        features = build_visible_history_feature_matrix(fold.ledger, source, panel.drop(columns=["tws_visible"]))
+        self.assertTrue(np.isnan(features.loc[0, "previous_visible_age_months"]))
+        self.assertEqual(float(features.loc[2, "previous_visible_age_months"]), 3.0)
 
     def test_real_test_template_reproduces_ids_and_horizon_counts(self) -> None:
         root = Path(__file__).resolve().parents[1]

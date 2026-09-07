@@ -644,11 +644,22 @@ def build_visible_history_feature_matrix(
     current = pd.to_datetime(ledger["last_observed_date"]).dt.to_period("M")
     previous = pd.to_datetime(ledger["previous_visible_date"], errors="coerce").dt.to_period("M")
     older = pd.to_datetime(ledger["older_visible_date"], errors="coerce").dt.to_period("M")
+
+    def calendar_distance(later: pd.Series, earlier: pd.Series) -> np.ndarray:
+        """Calendar months apart, retaining absent visible history as NaN."""
+        out = np.full(len(later), np.nan, dtype=np.float32)
+        present = later.notna() & earlier.notna()
+        if present.any():
+            out[present.to_numpy()] = (
+                later.loc[present].astype("int64").to_numpy()
+                - earlier.loc[present].astype("int64").to_numpy()
+            ).astype(np.float32)
+        return out
     out["previous_visible_TWS"] = ledger["previous_visible_TWS"].to_numpy(dtype=np.float32)
-    out["previous_visible_age_months"] = np.asarray(current - previous, dtype="float32")
+    out["previous_visible_age_months"] = calendar_distance(current, previous)
     out["older_visible_TWS"] = ledger["older_visible_TWS"].to_numpy(dtype=np.float32)
-    out["older_visible_age_months"] = np.asarray(current - older, dtype="float32")
-    out["previous_visible_spacing_months"] = np.asarray(previous - older, dtype="float32")
+    out["older_visible_age_months"] = calendar_distance(current, older)
+    out["previous_visible_spacing_months"] = calendar_distance(previous, older)
     out["has_previous_visible"] = previous.notna().to_numpy(dtype=np.float32)
     out["has_older_visible"] = older.notna().to_numpy(dtype=np.float32)
     values = out.to_numpy(dtype=np.float32)
