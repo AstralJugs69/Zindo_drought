@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse, hashlib, json, subprocess, sys, time
 from pathlib import Path
 import numpy as np, pandas as pd
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 from scripts.run_spatial_phase_a import _basis
 
 ORIGINS=("2007-09","2009-01","2014-12"); RANKS=(8,16)
