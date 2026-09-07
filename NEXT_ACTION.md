@@ -11,8 +11,10 @@
   `/kaggle/working/drought_runs/local_response_20260907T220239Z.zip`,
   92,481,289 bytes, SHA-256
   `6ce1bd4b98ffa6e7f84422d66b5e09869e1e181c342924926a93d6adea2d8c52`.
-  Kaggle's supported download action was invoked once; no matching local
-  Downloads file was observed, so durability remains **unverified/session-local**.
+  Kaggle's supported download action was invoked twice, including a retry after
+  reopening the notebook; no matching local Downloads file was observed, so
+  durability remains **unverified/session-local** and no repository copy could
+  be made.
 
 - Branch: `codex/validation-rebuild`. The completed local-response Kaggle run
   used the clean, pinned source commit
