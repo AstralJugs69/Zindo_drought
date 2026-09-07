@@ -18,10 +18,12 @@ from src.metrics import score_by_horizon
 from src.ml_features import (
     CORE_FEATURE_COLUMNS,
     HYDRO_FEATURE_COLUMNS,
+    TWS_HISTORY_FEATURE_COLUMNS,
     SOURCE_CORE_COLUMNS,
     SOURCE_HYDRO_COLUMNS,
     build_core_feature_matrix,
     build_hydro_feature_matrix,
+    build_tws_history_feature_matrix,
     build_sampled_training_rows,
     horizon_rebalance_weights,
     validation_horizon_weights,
@@ -85,9 +87,12 @@ def main() -> None:
     parser.add_argument("--early-stopping-rounds", type=int, default=100)
     parser.add_argument(
         "--feature-set",
-        choices=["core", "hydro"],
+        choices=["core", "hydro", "tws_history"],
         default="core",
-        help="core=EXP001; hydro=EXP002 fresh SPEI+soil ablation",
+        help=(
+            "core=EXP001; hydro=EXP002 fresh SPEI+soil; "
+            "tws_history=EXP003 adds exact-calendar TWS history behind legal anchor"
+        ),
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -115,15 +120,23 @@ def main() -> None:
     if args.feature_set == "core":
         feature_columns = CORE_FEATURE_COLUMNS
         source_columns = SOURCE_CORE_COLUMNS
-        feature_builder = build_core_feature_matrix
+        feature_builder = lambda ledger, sf: build_core_feature_matrix(ledger, sf)
         experiment_name = "EXP001"
         model_name = "exp001_core_delta_lgbm"
-    else:
+    elif args.feature_set == "hydro":
         feature_columns = HYDRO_FEATURE_COLUMNS
         source_columns = SOURCE_HYDRO_COLUMNS
-        feature_builder = build_hydro_feature_matrix
+        feature_builder = lambda ledger, sf: build_hydro_feature_matrix(ledger, sf)
         experiment_name = "EXP002"
         model_name = "exp002_fresh_hydro_delta_lgbm"
+    else:
+        feature_columns = TWS_HISTORY_FEATURE_COLUMNS
+        source_columns = SOURCE_HYDRO_COLUMNS
+        feature_builder = lambda ledger, sf: build_tws_history_feature_matrix(
+            ledger, sf, structural
+        )
+        experiment_name = "EXP003"
+        model_name = "exp003_tws_history_delta_lgbm"
 
     source_features = raw.loc[:, source_columns].copy()
     labels = raw.loc[:, ["sample_id", "target"]].copy()

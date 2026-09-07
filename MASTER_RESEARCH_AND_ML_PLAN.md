@@ -2669,3 +2669,51 @@ Interpretation:
 Decision:
 
 > **PROMOTE EXP002 unchanged to dev2 and dev3. Do not add engineered hydrologic deltas, lag stacks, EOFs, or tune LightGBM until this raw fresh-hydrology gain is confirmed across both remaining development folds.**
+
+## 2026-09-07 — EXP002 promoted across all three development folds
+
+The frozen EXP002 recipe was then run unchanged on dev2 and dev3. The protected lockbox remained untouched.
+
+| Fold | Persistence | EXP001 | EXP002 | EXP002 gain vs EXP001 |
+|---|---:|---:|---:|---:|
+| dev1 | 0.628228 | 0.569746 | **0.534132** | +0.035614 |
+| dev2 | 0.696437 | 0.637836 | **0.580907** | +0.056929 |
+| dev3 | 0.684559 | 0.621771 | **0.582126** | +0.039646 |
+
+Three-fold means:
+
+- persistence: **0.669741**;
+- EXP001: **0.609784**;
+- EXP002: **0.565722**.
+
+EXP002 improves the already-strong EXP001 mean by **0.044063 RMSE (~7.23%)** and improves persistence by **0.104020 RMSE (~15.53%)**.
+
+The improvement is again strongest at longer horizons. On dev2, for example, EXP002 reaches h7 RMSE **0.665266** versus persistence **0.937957**. On dev3, h7 is **0.644564** versus **0.869687** persistence.
+
+`SPEI_06_t` is the dominant new hydrometeorological feature on every fold and even becomes the second-highest gain feature on dev3, behind only `last_observed_TWS`. Soil moisture and SPEI-01 also contribute materially; SPEI-12 is consistently weaker but nonzero.
+
+Decision:
+
+> **PROMOTE EXP002 as the new development incumbent. Do not tune LightGBM yet. The next controlled ablation is causal TWS history behind the legal anchor.**
+
+## EXP003 — Causal TWS-history ablation
+
+EXP003 keeps the complete EXP002 feature set and adds only exact-calendar TWS history strictly behind the legal last-observed TWS anchor:
+
+```text
+TWS_anchor_lag1
+TWS_anchor_lag2
+TWS_anchor_lag3
+TWS_anchor_lag6
+TWS_anchor_lag12
+TWS_anchor_delta1
+TWS_anchor_delta3
+TWS_anchor_delta6
+TWS_anchor_delta12
+```
+
+For every example, these lags are joined relative to `last_observed_date`, not the current source month. Therefore an h>1 example can never use TWS from its simulated hidden interval. Missing GRACE calendar months remain missing and are passed to LightGBM as NaN; no interpolation, backfill, row-shift, or future state is used.
+
+All other choices remain frozen: same sampled-h training rows, same fresh source-month hydrology, same ΔTWS target, same LightGBM parameters, and same dev folds.
+
+Local dev1 dry-run checks passed with the same 975,657 training rows and 1,958,165 validation examples as EXP002. The EXP003 feature matrix is target-blind and ready for Kaggle training.

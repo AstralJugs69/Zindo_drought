@@ -44,6 +44,20 @@ SOURCE_HYDRO_COLUMNS = [
     "SOIL_MOISTURE_t",
 ]
 
+TWS_HISTORY_LAGS = (1, 2, 3, 6, 12)
+
+TWS_HISTORY_FEATURE_COLUMNS = HYDRO_FEATURE_COLUMNS + [
+    "TWS_anchor_lag1",
+    "TWS_anchor_lag2",
+    "TWS_anchor_lag3",
+    "TWS_anchor_lag6",
+    "TWS_anchor_lag12",
+    "TWS_anchor_delta1",
+    "TWS_anchor_delta3",
+    "TWS_anchor_delta6",
+    "TWS_anchor_delta12",
+]
+
 
 @dataclass(frozen=True)
 class SampledTrainingRows:
@@ -266,6 +280,87 @@ def build_hydro_feature_matrix(
     )
     if not np.isfinite(out.to_numpy(dtype=np.float32)).all():
         raise AssertionError("Hydro feature matrix contains non-finite values")
+    return out.reset_index(drop=True)
+
+
+def build_tws_history_feature_matrix(
+    ledger: pd.DataFrame,
+    source_features: pd.DataFrame,
+    structural: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build EXP003 = EXP002 plus exact-calendar TWS history behind the legal anchor.
+
+    Every TWS history value is joined relative to `last_observed_date`, never the
+    current source month. For h>1 this means the whole history stack remains behind
+    the simulated hidden interval. Missing GRACE calendar months remain NaN and are
+    handled natively by LightGBM; they are never backfilled or interpolated.
+    """
+    _assert_target_blind(ledger, "ledger")
+    _assert_target_blind(source_features, "source_features")
+    _assert_target_blind(structural, "structural")
+
+    required_ledger = {
+        "sample_id", "last_observed_TWS", "last_observed_date", "h", "lat", "lon"
+    }
+    missing = required_ledger.difference(ledger.columns)
+    if missing:
+        raise ValueError(f"Missing ledger columns: {sorted(missing)}")
+    required_structural = {"time", "lat", "lon", "TWS_t"}
+    missing = required_structural.difference(structural.columns)
+    if missing:
+        raise ValueError(f"Missing structural columns: {sorted(missing)}")
+
+    base = ledger.loc[:, [
+        "sample_id", "last_observed_TWS", "last_observed_date", "h", "lat", "lon"
+    ]].copy()
+    base["_order"] = np.arange(len(base), dtype=np.int64)
+
+    x = base.merge(
+        source_features.loc[:, SOURCE_HYDRO_COLUMNS],
+        how="left",
+        on="sample_id",
+        validate="many_to_one",
+        sort=False,
+    )
+
+    state = structural.loc[:, ["time", "lat", "lon", "TWS_t"]].copy()
+    state["state_period"] = pd.to_datetime(state["time"]).dt.to_period("M")
+    state = state.loc[:, ["lat", "lon", "state_period", "TWS_t"]]
+    if state.duplicated(["lat", "lon", "state_period"]).any():
+        raise AssertionError("Structural TWS lookup is not unique by location/calendar month")
+
+    anchor_period = pd.to_datetime(x["last_observed_date"]).dt.to_period("M")
+    for lag in TWS_HISTORY_LAGS:
+        lookup_period_col = f"_lag{lag}_period"
+        value_col = f"TWS_anchor_lag{lag}"
+        x[lookup_period_col] = anchor_period - lag
+        lookup = state.rename(
+            columns={"state_period": lookup_period_col, "TWS_t": value_col}
+        )
+        x = x.merge(
+            lookup,
+            how="left",
+            on=["lat", "lon", lookup_period_col],
+            validate="many_to_one",
+            sort=False,
+        )
+        x = x.drop(columns=[lookup_period_col])
+
+    for lag in (1, 3, 6, 12):
+        x[f"TWS_anchor_delta{lag}"] = (
+            x["last_observed_TWS"] - x[f"TWS_anchor_lag{lag}"]
+        )
+
+    x = x.sort_values("_order")
+    out = x.loc[:, TWS_HISTORY_FEATURE_COLUMNS].copy()
+    out = out.astype({
+        c: ("int8" if c == "h" else "float32")
+        for c in TWS_HISTORY_FEATURE_COLUMNS
+    })
+
+    values = out.to_numpy(dtype=np.float32)
+    if np.isinf(values).any():
+        raise AssertionError("TWS-history feature matrix contains infinite values")
     return out.reset_index(drop=True)
 
 
