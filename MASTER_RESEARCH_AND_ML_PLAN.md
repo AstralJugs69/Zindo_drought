@@ -8,6 +8,17 @@
 **Current phase:** Validation rebuild in progress. Historical EXP005/EXP009/EXP010
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
+
+## 2026-09-08 — bounded local-response experiment (Kaggle-only)
+
+Run `local_response_20260907T220239Z` completed from commit
+`60376c0ac9ce9438f1c3e05ed7b8612cc73f33c3` in 355.293 s using 173 rounds,
+alpha 30, and seed 20260907. December scoring used 109,349 availability-safe
+h=1..7 rows and retained the 90-row h>7 tail. Local response and the fixed
+blend failed the predeclared practical screen; no recipe is promoted and no
+additional search is authorized. Archive: `/kaggle/working/drought_runs/local_response_20260907T220239Z.zip`
+(92,481,289 bytes; SHA-256
+`6ce1bd4b98ffa6e7f84422d66b5e09869e1e181c342924926a93d6adea2d8c52`).
 **Local project path:** `C:\dev\zindi\drought`  
 **Git status at first compilation:** Folder exists, but it is not yet initialized as a Git repository and has no remote configured.
 

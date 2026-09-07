@@ -1,5 +1,19 @@
 # Next action — local-response stress result
 
+## 2026-09-08 — verified rerun at provenance-hardened commit
+
+- Kaggle rerun `local_response_20260907T220239Z` completed in **355.293 s** from
+  full commit `60376c0ac9ce9438f1c3e05ed7b8612cc73f33c3` on
+  `codex/validation-rebuild`, using seed `20260907`, 173 rounds, and alpha=30.
+  The result is deterministic and matches the table below; this is the current
+  reproducibility anchor (the earlier 34b7e3b run remains historical).
+- The no-raw-data archive is
+  `/kaggle/working/drought_runs/local_response_20260907T220239Z.zip`,
+  92,481,289 bytes, SHA-256
+  `6ce1bd4b98ffa6e7f84422d66b5e09869e1e181c342924926a93d6adea2d8c52`.
+  Kaggle's supported download action was invoked once; no matching local
+  Downloads file was observed, so durability remains **unverified/session-local**.
+
 - Branch: `codex/validation-rebuild`. The completed local-response Kaggle run
   used the clean, pinned source commit
   `34b7e3b132a463fb7d6cdd936ee188bc4f8b049d`; the local branch subsequently
