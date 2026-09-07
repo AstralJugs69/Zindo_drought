@@ -1,8 +1,9 @@
-﻿# Competition data / large local files
+# Competition data / large local files
 Train.csv
 Test.csv
 SampleSubmission.csv
 Trustworthiness_Evaluation.pdf
+StarterNotebook.ipynb
 
 # Generated artifacts
 artifacts/

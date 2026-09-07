@@ -2077,6 +2077,33 @@ Exact first engineering sequence:
 **Decision:** Kaggle is canonical free compute.  
 **Reason:** current free quota, reproducible notebooks/datasets, stable competition workflow, and no dependence on a paid/free-trial service.
 
+## 2026-09-07 — Calendar-safe dataset audit implemented
+
+**Implementation:** Added `scripts/audit_dataset.py` and ran it successfully against the local competition files before pushing it for Kaggle reproduction.
+
+**Verified structural results:**
+
+- Train rows: `2,154,021`
+- Test rows: `280,961`
+- Train unique locations: `15,715`
+- Test unique locations: `15,715`
+- Train source months: `138`
+- Test source months: `18`
+- Train range: `2002-05` to `2015-08`
+- Test range: `2015-09` to `2018-12`
+- exact next-calendar-month target/TWS matched pairs: `1,977,398`
+- target identity maximum absolute error: `0.0`
+- target identity RMSE: `0.0`
+- exact identity share: `1.0`
+- masked Test TWS rows: `186,913`
+- Test masked share: `0.6652631504`
+- Test TWS NaN rows: `186,913`
+- mask-vs-NaN mismatches: `0`
+
+**Important confirmation:** The audit deliberately uses an explicit next-calendar-month join rather than row-order shifting. It confirms that `target(cell,t) == TWS(cell,t+1)` exactly whenever the next calendar TWS row exists, and therefore reinforces the rule that the target table must remain inaccessible to feature-generation code.
+
+**Observed mostly-masked source months retain only a handful of legal current TWS values:** examples include `4` visible cells in 2017-05, `17` in 2016-03, `21` in 2017-04, `31` in 2018-12, and at most `65` among the audited mostly-masked months. This independently reconfirms the sparse-assimilation premise while also demonstrating why plain snapshot gap filling is severely underdetermined.
+
 ---
 
 # 30. Next update trigger
@@ -2093,4 +2120,3 @@ At that point append:
 - leakage-test results;
 - any discrepancy between expected and observed horizon counts;
 - first accepted/rejected feature hypotheses.
-
