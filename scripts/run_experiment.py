@@ -25,7 +25,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.baselines import predict_persistence
 from src.metrics import raw_rmse, score_by_horizon
-from src.observation_simulator import build_mask_block_fold
+from src.observation_simulator import build_mask_block_fold, build_template_replay_fold
+from src.validation import build_test_mask_template, find_exact_template_starts
 
 
 def _sha256(path: Path) -> str:
@@ -74,48 +75,60 @@ def _preflight(data_dir: Path) -> dict[str, object]:
     }
 
 
+def _score_persistence(fold, role: str) -> tuple[dict[str, object], pd.DataFrame]:
+    y = fold.labels["target"].to_numpy(dtype=np.float64)
+    p = predict_persistence(fold.ledger)
+    present_h = sorted(int(v) for v in fold.ledger["h"].unique())
+    weighted = None
+    by_h = None
+    if present_h == list(range(1, 8)):
+        weighted, horizon = score_by_horizon(y, p, fold.ledger["h"])
+        by_h = horizon.reset_index().to_dict(orient="records")
+    row = {
+        "scenario_id": fold.spec.scenario_id, "family": fold.spec.family, "role": role,
+        "spec_hash": fold.spec.digest(), "training_target_cutoff": fold.spec.training_target_cutoff,
+        "rows": int(len(fold.ledger)), "horizons_present": present_h,
+        "raw_rmse": raw_rmse(y, p), "weighted_rmse": weighted,
+        "exclusions": fold.exclusions, "by_h": by_h,
+    }
+    oof = pd.DataFrame({
+        "sample_id": fold.ledger["sample_id"], "scenario_id": fold.spec.scenario_id,
+        "source_date": fold.ledger["source_date"], "h": fold.ledger["h"],
+        "anchor_date": fold.ledger["last_observed_date"], "anchor_tws": fold.ledger["last_observed_TWS"],
+        "truth": y, "prediction": p, "model": "R00_persistence", "role": role,
+    })
+    return row, oof
+
+
 def _r00(data_dir: Path, out_dir: Path) -> dict[str, object]:
     columns = ["sample_id", "time", "lat", "lon", "TWS_t", "target"]
     train = pd.read_csv(data_dir / "Train.csv", usecols=columns)
-    # Predeclared candidate origins.  The latest (Dec-2014) is deliberately not
-    # used for model selection; R00 opens it only as a data/geometry check.
-    scenarios = [
-        ("recent_2011_12_to_2012_06", "2011-12", "2012-06", "development"),
-        ("recent_2012_12_to_2013_06", "2012-12", "2013-06", "development"),
-        ("recent_2013_12_to_2014_06", "2013-12", "2014-06", "development"),
-        ("confirm_2014_12_to_2015_06", "2014-12", "2015-06", "confirmation"),
+    test = pd.read_csv(data_dir / "Test.csv", usecols=["ID", "time", "lat", "lon", "TWS_t", "TWS_t_masked"])
+    template = build_test_mask_template(test)
+    starts = find_exact_template_starts(train, template)
+    september = [start for start in starts if start.month == 9]
+    if len(september) < 2:
+        raise AssertionError(f"Expected at least two September template starts, found {september}")
+    replay_specs = [
+        ("exact_latest", starts[-1], "exact_template_replay", "development"),
+        ("season_aligned_sep_a", september[-2], "season_aligned_template_replay", "development"),
+        ("season_aligned_sep_b", september[-1], "season_aligned_template_replay", "development"),
     ]
+    # This is a declared stress/coverage scenario, not a promotion metric. Missing
+    # historical source months may make h exceed seven; it is reported verbatim.
+    stress_specs = [("confirm_2014_12_to_2015_06", "2014-12", "2015-06", "confirmation")]
     rows: list[dict[str, object]] = []
     oof: list[pd.DataFrame] = []
-    for scenario_id, anchor, end, role in scenarios:
+    for scenario_id, start, family, role in replay_specs:
+        fold = build_template_replay_fold(train, template, start_month=start, scenario_id=scenario_id, family=family)
+        row, frame = _score_persistence(fold, role)
+        rows.append(row)
+        oof.append(frame)
+    for scenario_id, anchor, end, role in stress_specs:
         fold = build_mask_block_fold(train, anchor_month=anchor, end_month=end, scenario_id=scenario_id)
-        y = fold.labels["target"].to_numpy(dtype=np.float64)
-        p = predict_persistence(fold.ledger)
-        present_h = sorted(int(v) for v in fold.ledger["h"].unique())
-        weighted = None
-        by_h = None
-        if present_h == list(range(1, 8)):
-            weighted, horizon = score_by_horizon(y, p, fold.ledger["h"])
-            by_h = horizon.reset_index().to_dict(orient="records")
-        rows.append({
-            "scenario_id": scenario_id,
-            "role": role,
-            "spec_hash": fold.spec.digest(),
-            "training_target_cutoff": fold.spec.training_target_cutoff,
-            "rows": int(len(fold.ledger)),
-            "horizons_present": present_h,
-            "raw_rmse": raw_rmse(y, p),
-            "weighted_rmse": weighted,
-            "exclusions": fold.exclusions,
-            "by_h": by_h,
-        })
-        oof.append(pd.DataFrame({
-            "sample_id": fold.ledger["sample_id"], "scenario_id": scenario_id,
-            "source_date": fold.ledger["source_date"], "h": fold.ledger["h"],
-            "anchor_date": fold.ledger["last_observed_date"],
-            "anchor_tws": fold.ledger["last_observed_TWS"], "truth": y,
-            "prediction": p, "model": "R00_persistence", "role": role,
-        }))
+        row, frame = _score_persistence(fold, role)
+        rows.append(row)
+        oof.append(frame)
     oof_frame = pd.concat(oof, ignore_index=True)
     oof_frame.to_csv(out_dir / "oof.csv.gz", index=False, compression="gzip")
     return {"candidate": "R00_persistence", "scenarios": rows, "oof": "oof.csv.gz"}

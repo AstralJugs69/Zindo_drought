@@ -5,9 +5,30 @@
 **Competition close:** 2026-09-13  
 **Document role:** Canonical research ledger, modeling blueprint, experiment discipline, leakage specification, compute plan, and living decision record for the entire challenge.  
 **First compiled:** 2026-09-07  
-**Current phase:** Causal validation infrastructure is complete; EXP005 hydrologic-gap LightGBM is the current dev incumbent; the recent lockbox has been opened once for frozen EXP003 only; subsequent tuning remains dev-fold-only.
+**Current phase:** Validation rebuild in progress. Historical EXP005/EXP009/EXP010
+records are retained as legacy references only; no candidate is currently promoted
+under the corrected multi-scenario protocol.
 **Local project path:** `C:\dev\zindi\drought`  
 **Git status at first compilation:** Folder exists, but it is not yet initialized as a Git repository and has no remote configured.
+
+---
+
+## Current rebuild status — 2026-09-07
+
+The active branch is `codex/validation-rebuild` at
+`b3bad826113e7a47350e798ed4dbda197d1bea02`. Kaggle preflight passed with the
+attached data hashes recorded in run `preflight_20260907T140625Z`, LightGBM 4.6.0,
+and no package installation. The bootstrap now asserts its remote, branch, clean
+tree, and full commit before any runner starts.
+
+R00 (`preflight_20260907T140714Z`) first exercised a December 2014 to June 2015
+anchor-and-hide stress block. It correctly exposed real calendar gaps: horizons
+reached 13 rather than only 1--7, so the run reported raw persistence RMSE 0.861803
+but deliberately omitted the test-mixture weighted RMSE. This is counterevidence
+against treating contiguous observed rows as an interchangeable Test schedule. The
+next R00 revision uses exact Test-template replays (including two September-aligned
+starts) for promotion metrics and retains the December block only as a labeled
+coverage stress test. No leaderboard claim follows from either run.
 
 ---
 
