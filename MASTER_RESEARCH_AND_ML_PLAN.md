@@ -2923,6 +2923,40 @@ Rationale: the same ~15.7k spatial locations recur throughout the panel and are 
 
 Evaluation policy: **run EXP006 on dev3 first against EXP005 = 0.553415. Promote only for a material gain; do not touch the lockbox.**
 
+## 2026-09-07 — EXP006 and EXP007 spatial ablations killed
+
+Two cheap static-spatial augmentations were tested on dev3 and both failed to beat the promoted EXP005 incumbent:
+
+| Model | dev3 weighted RMSE | Change vs EXP005 |
+|---|---:|---:|
+| EXP005 hydrologic-gap incumbent | **0.553415** | — |
+| EXP006 + categorical `location_id` | 0.555320 | -0.001905 |
+| EXP007 + 8 fold-causal EOF loadings | 0.554025 | -0.000611 |
+
+EXP007 fit its rank-8 EOF basis only through 2011-07 for the dev3 fold and the first eight modes explained about 66.0% of historical TWS field variance. Several EOF loadings received meaningful LightGBM gain importance, but that spatial representation still did not improve validation. Together with the categorical-location failure, this is enough evidence to stop spending near-term runs on static spatial encodings.
+
+Decision: **KILL EXP006 and EXP007. Do not sweep location categories or EOF ranks inside the pooled tree model. A future dynamic low-rank forecast branch remains conceptually distinct, but is no longer an immediate priority.**
+
+## 2026-09-07 — EXP008 horizon-specialist formulation killed
+
+EXP008 replaced the single pooled EXP005 LightGBM with seven independent LightGBMs, one per effective TWS horizon, while keeping the feature set and base parameters fixed.
+
+```text
+EXP005 dev3 pooled       = 0.553415
+EXP008 dev3 specialists = 0.554486
+regression               = 0.001072
+```
+
+Only h=1 improved materially (`0.497522 -> 0.496190`). h=2-h7 were flat to worse, with the clearest deterioration at h5 and h6 where the specialist training sets contain only about 81k rows each. The pooled model therefore benefits from cross-horizon statistical strength more than it suffers from horizon heterogeneity.
+
+Decision: **KILL fully separate horizon specialists. Retain the pooled EXP005 formulation. The h=1 specialist gain is too small to justify a hybrid production path at this stage.**
+
+## EXP005 final-candidate lockbox checkpoint
+
+Feature screening is now paused. EXP005 is the only model that has beaten its predecessor across all three development folds, while EXP006-EXP008 all failed on dev3. Before building the first real test submission, EXP005 will be scored exactly once on the already-defined 2013-11 -> 2015-08 recent lockbox.
+
+This is a **final-candidate confirmation**, not a new tuning loop: the EXP005 feature set and LightGBM parameters are frozen, and the result will be used to decide whether to proceed directly to full-train inference and the first Zindi submission. No new feature will be selected by repeatedly querying this lockbox.
+
 ## 2026-09-07 — EXP006 categorical location identity: killed
 
 EXP006 was evaluated on dev3 with every EXP005 feature unchanged plus native categorical `location_id`:
