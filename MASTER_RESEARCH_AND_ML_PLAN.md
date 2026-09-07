@@ -28,7 +28,12 @@ but deliberately omitted the test-mixture weighted RMSE. This is counterevidence
 against treating contiguous observed rows as an interchangeable Test schedule. The
 next R00 revision uses exact Test-template replays (including two September-aligned
 starts) for promotion metrics and retains the December block only as a labeled
-coverage stress test. No leaderboard claim follows from either run.
+coverage stress test. The first streaming template implementation then failed
+closed in `preflight_20260907T141306Z`: source-month presence was not complete for
+every historical location, so its calculated horizon differed from the old copied
+template horizon. The correction freezes only each replay's complete-coverage
+locations, reports excluded locations/rows, and retains the equality assertion.
+No leaderboard claim follows from any of these runs.
 
 ---
 

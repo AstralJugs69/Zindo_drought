@@ -197,7 +197,21 @@ def build_template_replay_fold(
     x["source_period"] = _period(x["time"])
     mapping = template.loc[:, ["lat", "lon", "offset_months", "template_visible", "template_h"]].copy()
     mapping["source_period"] = mapping["offset_months"].map(lambda offset: start + int(offset))
-    window = x.merge(mapping, on=["lat", "lon", "source_period"], how="inner", validate="one_to_one")
+    candidate = x.merge(
+        mapping, on=["lat", "lon", "source_period"], how="inner", validate="one_to_one"
+    )
+    # A global source-month match is insufficient: an individual historical grid
+    # point may be absent for one of the template's source months.  Retain only
+    # locations with the complete row schedule so stream-derived horizons remain
+    # comparable to the real Test template.  This coverage rule is fixed before
+    # any candidate predictions are constructed.
+    expected = mapping.groupby(["lat", "lon"], sort=False).size().rename("expected_rows")
+    found = candidate.groupby(["lat", "lon"], sort=False).size().rename("found_rows")
+    coverage = expected.to_frame().join(found, how="left").fillna({"found_rows": 0})
+    complete_locations = coverage.loc[
+        coverage["found_rows"] == coverage["expected_rows"]
+    ].reset_index()[["lat", "lon"]]
+    window = candidate.merge(complete_locations, on=["lat", "lon"], how="inner", validate="many_to_one")
     if window.empty:
         raise AssertionError("Template replay has no historical source rows")
     prefix = x.loc[x["source_period"] < start].copy()
@@ -219,5 +233,11 @@ def build_template_replay_fold(
     expected = window.set_index("sample_id").loc[fold.ledger["sample_id"], "template_h"].to_numpy(dtype=np.int16)
     actual = fold.ledger["h"].to_numpy(dtype=np.int16)
     if not np.array_equal(actual, expected):
-        raise AssertionError("Streaming replay horizon differs from the transplanted Test template")
-    return fold
+        mismatch = int((actual != expected).sum())
+        raise AssertionError(
+            f"Streaming replay horizon differs from template for {mismatch}/{len(actual)} fully-covered rows"
+        )
+    exclusions = dict(fold.exclusions)
+    exclusions["incomplete_template_locations"] = int((coverage["found_rows"] != coverage["expected_rows"]).sum())
+    exclusions["incomplete_template_rows"] = int(len(mapping) - len(window))
+    return SimulatedFold(spec=fold.spec, ledger=fold.ledger, labels=fold.labels, exclusions=exclusions)
