@@ -2422,4 +2422,69 @@ Additional causality assertion:
 masked rows using same-month hidden TWS = 0
 ```
 
-Status: **PASS locally; pending Kaggle reproduction at time of this update**.
+Status: **PASS locally and reproduced on Kaggle**.
+
+---
+
+# 32. 2026-09-07 — Baseline reproduction and EXP001 launch checkpoint
+
+Kaggle reproduced the causal baseline suite exactly on dev1–dev3. The protected 2013-11→2015-08 lockbox remained untouched.
+
+Verified persistence weighted RMSE:
+
+| Fold | Persistence weighted RMSE |
+|---|---:|
+| dev1 | 0.628228 |
+| dev2 | 0.696437 |
+| dev3 | 0.684559 |
+| mean | 0.669741 |
+
+Cheap structural alternatives were uniformly worse across all three development folds:
+
+- seasonal-anomaly persistence mean ≈ 0.701874;
+- harmonic+trend mean ≈ 0.946143;
+- lag-12-or-persistence mean ≈ 0.952773.
+
+Decision:
+
+> **Persistence is the incumbent baseline. Do not spend additional compute polishing standalone lag-12 or unshrunk harmonic/seasonal baselines unless later residual diagnostics show a specific slice where they add ensemble value.**
+
+The first ML experiment, **EXP001**, is now defined as a pooled direct-residual LightGBM predicting:
+
+```text
+delta = target_TWS - last_legal_TWS
+```
+
+with the deliberately minimal feature set:
+
+```text
+last_observed_TWS
+h
+lat
+lon
+month_sin
+month_cos
+```
+
+Training formulation:
+
+- one deterministic sampled horizon per eligible historical source row;
+- horizon sampling follows the exact test row-level h distribution;
+- rows with unavailable historical anchors are dropped;
+- per-row training weights rebalance surviving rows back to the exact test h mixture;
+- source feature construction is target-blind;
+- labels are joined only at the supervised boundary;
+- validation uses the audited direct h=1..7 dev folds;
+- validation weights make LightGBM L2 equal the exact test-horizon-weighted MSE;
+- the lockbox is explicitly rejected by the EXP001 CLI.
+
+Local target-blind dev1 dry run passed with:
+
+```text
+train rows: 975,657
+validation rows: 1,958,165
+dropped sampled rows missing historical anchor: 54,811
+persistence reference: 0.628228
+```
+
+EXP001 intentionally does **not** use current SPEI or soil moisture yet. Its purpose is to isolate the value of the pooled ΔTWS formulation, h-conditioning, geography and seasonality before adding fresh hydrometeorological information in the next controlled ablation.
