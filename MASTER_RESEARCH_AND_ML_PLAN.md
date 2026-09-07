@@ -3119,6 +3119,14 @@ max  =  3.301893
 
 Training used **1,977,029** legal supplied labelled examples and completed in about **25.2 s** on Kaggle CPU. The artifact is **ready to upload but not yet recorded as submitted**. No additional model branch should be opened until the first public-leaderboard score is observed.
 
+## 2026-09-07 — Submission #2: availability fix helps, but only slightly on public LB
+
+The EXP010 horizon hybrid (`EXP005` for h1-h2, availability-safe `EXP009` for h3-h7) scored **0.753313479** publicly versus **0.75789118** for Submission #1. The improvement is **0.004577701 RMSE (~0.60%)**. This confirms that the sparse Test TWS-history availability mismatch was a real problem, but it is not the dominant source of the remaining leaderboard gap.
+
+Do **not** spend Submission #3 on pure EXP009 yet. The corrected historical replay favored EXP009/EXP010, but the real leaderboard response was much smaller than the replay implied, so another structural source of signal is missing.
+
+Publicly available competition notes independently emphasize **cell-by-calendar-month TWS climatology/anomaly structure** as a high-value feature family. This is materially different from the already-killed harmonic/trend baseline: discrete climatology does not force a sinusoidal seasonal shape and is naturally robust to the sparse 2016-2018 Test TWS calendar. The next diagnostic is therefore a strictly causal location x calendar-month climatology fit only before the historical replay window, scored as target-month climatology and climatology + persisted legal-anchor anomaly. No leaderboard slot should be used until this diagnostic is inspected.
+
 ## 2026-09-07 — availability-faithful replay selects EXP009 / EXP010 for Submission #2
 
 The newly added availability-faithful historical replay reproduces the real Test feature-availability pattern by keeping a full historical prefix, transplanting the actual 18 Test source-month offsets, and blanking TWS on transplanted masked rows. Under this validator, TWS-history availability closely matches real Test (`lag1≈0.0556`, `lag2≈0.0554`, `lag3≈0.0566`, `lag6≈0.6062`, `lag12≈0.4443`, all lags≈0.0551).
