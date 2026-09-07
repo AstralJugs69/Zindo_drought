@@ -2611,3 +2611,61 @@ Decision:
 > **PROMOTE EXP001 unchanged to dev2 and dev3 before adding any feature or tuning any hyperparameter.**
 
 The next experiment is not a new model. It is the frozen-recipe robustness check on dev2/dev3. Only if EXP001 remains superior across those folds do we proceed to EXP002, which will add fresh current-month SPEI and soil moisture as the first controlled hydrometeorological ablation.
+
+---
+
+# 34. 2026-09-07 — EXP002 dev1 result: fresh hydrometeorology strongly promoted
+
+Kaggle completed the first controlled EXP002 run on **dev1 only**, with the lockbox still untouched.
+
+EXP002 changed exactly one thing relative to EXP001: it added fresh source-month `SPEI_01_t`, `SPEI_03_t`, `SPEI_06_t`, `SPEI_12_t`, and `SOIL_MOISTURE_t`. The ΔTWS target, sampled-h training construction, exact horizon reweighting, LightGBM parameters, and validation fold were unchanged.
+
+Headline result:
+
+| Model | dev1 weighted RMSE | Gain vs persistence | Incremental gain vs EXP001 |
+|---|---:|---:|---:|
+| Persistence | 0.628228 | — | — |
+| EXP001 core ΔTWS LightGBM | 0.569746 | +0.058482 | — |
+| EXP002 + fresh hydrology | **0.534132** | **+0.094096** | **+0.035614** |
+
+Relative to EXP001, EXP002 improves dev1 by approximately **6.25%**. Relative to persistence, total gain is **14.98%**.
+
+Per-horizon EXP002 RMSE:
+
+| h | Persistence | EXP001 | EXP002 | EXP002 gain vs persistence |
+|---:|---:|---:|---:|---:|
+| 1 | 0.516190 | 0.485096 | **0.481311** | 0.034879 |
+| 2 | 0.616391 | 0.564925 | **0.540535** | 0.075856 |
+| 3 | 0.667828 | 0.604004 | **0.560606** | 0.107222 |
+| 4 | 0.691629 | 0.618119 | **0.563263** | 0.128366 |
+| 5 | 0.713380 | 0.631997 | **0.565692** | 0.147688 |
+| 6 | 0.757236 | 0.662408 | **0.580271** | 0.176965 |
+| 7 | 0.785540 | 0.680662 | **0.587726** | 0.197815 |
+
+The incremental hydrologic benefit is very small at h=1 but becomes large as TWS grows stale. This is exactly the expected behavior if fresh SPEI/soil information is helping bridge the unobserved storage evolution rather than merely duplicating current TWS.
+
+Gain-based feature importance in EXP002 dev1:
+
+1. `last_observed_TWS` — 584,169;
+2. `lat` — 187,259;
+3. `lon` — 163,329;
+4. `SPEI_06_t` — 149,225;
+5. `h` — 101,578;
+6. `SOIL_MOISTURE_t` — 42,706;
+7. `SPEI_01_t` — 39,361;
+8. `month_sin` — 31,881;
+9. `month_cos` — 29,204;
+10. `SPEI_03_t` — 19,731;
+11. `SPEI_12_t` — 9,900.
+
+Interpretation:
+
+- the supplied hydrometeorological variables contain substantial orthogonal signal beyond stale TWS/geography/season;
+- `SPEI_06_t` is the strongest new variable by a wide margin in dev1;
+- the strongest total gains occur at h=5–7, which supports the stale-state bridge interpretation;
+- current source-month exogenous covariates remain causally legal because only TWS-derived state is restricted to the stale anchor;
+- no hyperparameter tuning has been performed yet.
+
+Decision:
+
+> **PROMOTE EXP002 unchanged to dev2 and dev3. Do not add engineered hydrologic deltas, lag stacks, EOFs, or tune LightGBM until this raw fresh-hydrology gain is confirmed across both remaining development folds.**
