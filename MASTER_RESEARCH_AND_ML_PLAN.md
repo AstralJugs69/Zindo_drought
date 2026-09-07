@@ -3038,6 +3038,12 @@ Rationale: EXP006 showed that exact location memorization is not helpful, but th
 
 Evaluation policy: **run EXP007 on dev3 first against EXP005 = 0.553415. Do not revisit the lockbox. Promote only for a clear gain; otherwise stop adding static spatial encodings and move to the next temporal/training-formulation experiment.**
 
+## 2026-09-07 — Availability-faithful replay overturns EXP005 and motivates EXP009/EXP010
+
+The first availability-faithful replay reproduced the real Test TWS-history missingness almost exactly (lag1/lag2/lag3 availability ~5.5%, lag6 ~60.6%, lag12 ~44.4%). On this validator, EXP005 degraded to **0.583334**, while EXP009 (same model without fragile exact-calendar TWS lag/delta features) improved to **0.577198**. The gain was concentrated at h3-h7; EXP005 remained better at h1-h2.
+
+Using EXP005 for h1-h2 and EXP009 for h3-h7 yields an implied replay RMSE of approximately **0.570509**, materially better than either model alone. This horizon-gated combination is named **EXP010**. For the first submission candidate built from this corrected validator, use replay-selected fixed boosting rounds (EXP005=183, EXP009=173) and preserve the original raw Train sample IDs for deterministic-horizon sampling so full-data training matches development hashing exactly.
+
 ## 2026-09-07 — EXP006/007/008 killed; EXP005 frozen for Submission #1
 
 Three controlled follow-up branches failed to improve the promoted EXP005 dev3 score of **0.553415**:
