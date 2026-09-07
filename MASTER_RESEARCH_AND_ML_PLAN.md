@@ -2488,3 +2488,64 @@ persistence reference: 0.628228
 ```
 
 EXP001 intentionally does **not** use current SPEI or soil moisture yet. Its purpose is to isolate the value of the pooled ΔTWS formulation, h-conditioning, geography and seasonality before adding fresh hydrometeorological information in the next controlled ablation.
+
+---
+
+# 33. 2026-09-07 — EXP001 dev1 result: pooled ΔTWS LightGBM promoted
+
+Kaggle completed the first real ML run of EXP001 on **dev1 only**, with the lockbox still untouched.
+
+Configuration remained exactly as specified above:
+
+- target = `target_TWS - last_legal_TWS`;
+- pooled h=1..7 model;
+- features = `last_observed_TWS`, `h`, `lat`, `lon`, `month_sin`, `month_cos`;
+- 975,657 sampled training rows;
+- 1,958,165 direct-horizon validation examples;
+- no SPEI, soil moisture, TWS lag stack, rolling features, EOF features, external data, or hyperparameter search.
+
+Headline result:
+
+| Model | dev1 weighted RMSE | Absolute gain | Relative gain |
+|---|---:|---:|---:|
+| Persistence | 0.628228 | — | — |
+| EXP001 core ΔTWS LightGBM | **0.569746** | **0.058482** | **9.31%** |
+
+Best iteration = **51**. Runtime ≈ **100 s** on Kaggle CPU.
+
+Per-horizon results:
+
+| h | Persistence RMSE | EXP001 RMSE | Absolute gain |
+|---:|---:|---:|---:|
+| 1 | 0.516190 | **0.485096** | 0.031095 |
+| 2 | 0.616391 | **0.564925** | 0.051466 |
+| 3 | 0.667828 | **0.604004** | 0.063824 |
+| 4 | 0.691629 | **0.618119** | 0.073509 |
+| 5 | 0.713380 | **0.631997** | 0.081383 |
+| 6 | 0.757236 | **0.662408** | 0.094828 |
+| 7 | 0.785540 | **0.680662** | 0.104878 |
+
+The improvement is present at **every horizon** and grows monotonically with horizon. This is especially important because it argues against an h=1-only artifact and strongly supports the intended direct-horizon residual formulation for stale-TWS rows.
+
+Gain-based feature importance:
+
+1. `last_observed_TWS` — 555,666;
+2. `lat` — 127,722;
+3. `lon` — 117,784;
+4. `h` — 53,987;
+5. `month_sin` — 27,043;
+6. `month_cos` — 25,288.
+
+Interpretation:
+
+- stale state remains dominant, as expected;
+- geography already carries substantial correction signal even without hydrologic covariates;
+- explicit horizon conditioning is useful;
+- simple seasonal phase contributes but is secondary;
+- the strong longer-horizon gains make the model structurally complementary to persistence rather than merely a minor one-step correction.
+
+Decision:
+
+> **PROMOTE EXP001 unchanged to dev2 and dev3 before adding any feature or tuning any hyperparameter.**
+
+The next experiment is not a new model. It is the frozen-recipe robustness check on dev2/dev3. Only if EXP001 remains superior across those folds do we proceed to EXP002, which will add fresh current-month SPEI and soil moisture as the first controlled hydrometeorological ablation.
