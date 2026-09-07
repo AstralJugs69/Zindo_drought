@@ -2,7 +2,8 @@
 
 R00 is a no-fit legal persistence baseline. R01 keeps the old independent
 horizon sampler as a comparator; R02 replaces it with transplanted historical
-observation schedules; R03 adds simulator-derived recent visible history.
+observation schedules; R03 adds simulator-derived recent visible history; R04
+is the matched absolute-target formulation of R01.
 """
 from __future__ import annotations
 
@@ -167,6 +168,15 @@ def _attach_delta(rows: pd.DataFrame, labels: pd.DataFrame) -> np.ndarray:
     return joined["target"].to_numpy(dtype=np.float32) - joined["last_observed_TWS"].to_numpy(dtype=np.float32)
 
 
+def _attach_absolute(rows: pd.DataFrame, labels: pd.DataFrame) -> np.ndarray:
+    joined = rows.loc[:, ["sample_id"]].merge(
+        labels.loc[:, ["sample_id", "target"]], on="sample_id", how="left", validate="one_to_one", sort=False
+    )
+    if joined["target"].isna().any():
+        raise AssertionError("Training row is missing its label")
+    return joined["target"].to_numpy(dtype=np.float32)
+
+
 def _scenario_training_rows(train: pd.DataFrame, template: pd.DataFrame, eval_start: pd.Period) -> tuple[pd.DataFrame, list[str]]:
     """Choose non-overlapping historical Test-template blocks before the cutoff."""
     max_offset = int(template["offset_months"].max())
@@ -202,12 +212,13 @@ def _model_run(mode: str, train: pd.DataFrame, template: pd.DataFrame, out_dir: 
                    "data_random_seed": seed, "num_threads": os.cpu_count() or 1})
     feature_names = VISIBLE_HISTORY_FEATURE_COLUMNS if mode == "r03" else HYDRO_GAP_SAFE_FEATURE_COLUMNS
     build_features = build_visible_history_feature_matrix if mode == "r03" else build_hydro_gap_safe_feature_matrix
+    absolute_target = mode == "r04"
     all_rows: list[dict[str, object]] = []
     all_oof: list[pd.DataFrame] = []
     model_dir = out_dir / "models"; model_dir.mkdir()
     for fold, role in _development_folds(train, template):
         start = pd.Period(fold.spec.first_source_month, freq="M")
-        if mode == "r01":
+        if mode in {"r01", "r04"}:
             sampled = build_sampled_training_rows(structural, source.loc[:, SOURCE_CORE_COLUMNS],
                                                   max_target_month=start - 1, seed=seed)
             train_rows = sampled.rows
@@ -217,7 +228,7 @@ def _model_run(mode: str, train: pd.DataFrame, template: pd.DataFrame, out_dir: 
             train_rows, starts = _scenario_training_rows(train, template, start)
             training_schedule = {"kind": "non_overlapping_transplanted_test_schedules", "starts": starts,
                                  "rows": int(len(train_rows))}
-        y_train = _attach_delta(train_rows, labels)
+        y_train = _attach_absolute(train_rows, labels) if absolute_target else _attach_delta(train_rows, labels)
         weights = horizon_rebalance_weights(train_rows["h"])
         x_train = build_features(train_rows, source, structural)
         x_valid = build_features(fold.ledger, source, structural)
@@ -225,9 +236,12 @@ def _model_run(mode: str, train: pd.DataFrame, template: pd.DataFrame, out_dir: 
                             num_boost_round=rounds, callbacks=[lgb.log_evaluation(0)])
         model_path = model_dir / f"{mode}_{fold.spec.scenario_id}.txt"
         booster.save_model(str(model_path))
-        prediction = fold.ledger["last_observed_TWS"].to_numpy(dtype=np.float64) + booster.predict(x_valid)
+        prediction = booster.predict(x_valid)
+        if not absolute_target:
+            prediction = fold.ledger["last_observed_TWS"].to_numpy(dtype=np.float64) + prediction
         row, oof = _score(mode.upper(), fold, role, prediction)
-        row.update({"rounds": rounds, "feature_names": feature_names, "training_schedule": training_schedule,
+        row.update({"rounds": rounds, "label_transformation": "absolute_target" if absolute_target else "target_minus_anchor",
+                    "feature_names": feature_names, "training_schedule": training_schedule,
                     "training_rows": int(len(train_rows)), "model_file": str(model_path.relative_to(out_dir))})
         all_rows.append(row); all_oof.append(oof)
     pd.concat(all_oof, ignore_index=True).to_csv(out_dir / "oof.csv.gz", index=False, compression="gzip")
@@ -240,7 +254,7 @@ def main() -> None:
     parser.add_argument("--data-dir", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--mode", choices=("preflight", "r00", "r01", "r02", "r03"), required=True)
+    parser.add_argument("--mode", choices=("preflight", "r00", "r01", "r02", "r03", "r04"), required=True)
     parser.add_argument("--rounds", type=int, default=173, help="Frozen rounds for matched R01-R03 comparisons.")
     parser.add_argument("--seed", type=int, default=20260907)
     args = parser.parse_args()
