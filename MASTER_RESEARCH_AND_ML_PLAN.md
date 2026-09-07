@@ -2718,6 +2718,26 @@ All other choices remain frozen: same sampled-h training rows, same fresh source
 
 Local dev1 dry-run checks passed with the same 975,657 training rows and 1,958,165 validation examples as EXP002. The EXP003 feature matrix is target-blind and ready for Kaggle training.
 
+## 2026-09-07 — EXP003 promoted across all three development folds
+
+The frozen EXP003 recipe was run unchanged on dev2 and dev3 after its dev1 promotion. The protected lockbox remained untouched.
+
+| Fold | EXP002 | EXP003 | Incremental gain |
+|---|---:|---:|---:|
+| dev1 | 0.534132 | **0.509946** | +0.024186 |
+| dev2 | 0.580907 | **0.571174** | +0.009734 |
+| dev3 | 0.582126 | **0.557687** | +0.024439 |
+
+Full three-fold mean EXP003 weighted RMSE is approximately **0.546269**, versus **0.565722** for EXP002 and **0.669741** for persistence. EXP003 therefore improves EXP002 by approximately **0.019453 RMSE (~3.4%)** and persistence by approximately **0.123472 RMSE (~18.4%)**.
+
+The improvement remains broad across horizons and folds rather than being an h=1 artifact. On dev2, EXP003 reaches h7 RMSE **0.669805** versus **0.937957** persistence. On dev3, h7 is **0.627126** versus **0.869687** persistence.
+
+Across all three folds, the strongest added TWS-history signals are the pre-anchor change features (`TWS_anchor_delta1`, `delta3`, `delta12`, then `delta6`). The raw anchor lags are consistently weaker. This supports the interpretation that recent pre-anchor trajectory is more useful than simply adding more historical levels.
+
+Decision:
+
+> **PROMOTE EXP003 as the development incumbent. Before opening the protected recent lockbox, run the frozen EXP003 recipe once on the latest exact historical replay of the real test mask geometry. If it remains strong there, open the lockbox once.**
+
 ## 2026-09-07 — EXP003 dev1 result: causal TWS history strongly promoted
 
 Kaggle completed EXP003 on dev1 with the exact same training rows, validation rows, sampled-h construction, ΔTWS target, fresh hydrology, LightGBM parameters, and protected lockbox policy as EXP002. The only change was the addition of exact-calendar TWS history behind the legal anchor.
@@ -2759,3 +2779,88 @@ The raw historical levels are much weaker. This supports the interpretation that
 Decision:
 
 > **PROMOTE EXP003 to dev2 and dev3 unchanged. Do not tune LightGBM or add more TWS lags until this exact feature set is confirmed on both remaining development folds.**
+
+---
+
+# 35. 2026-09-07 — EXP003 full validation, lockbox shift, EXP004 kill, EXP005 launch
+
+## EXP003 confirmed on dev2/dev3
+
+The frozen EXP003 recipe remained superior to EXP002 on both remaining development folds:
+
+| Fold | EXP002 | EXP003 | Incremental gain |
+|---|---:|---:|---:|
+| dev1 | 0.534132 | **0.509946** | +0.024186 |
+| dev2 | 0.580907 | **0.571174** | +0.009734 |
+| dev3 | 0.582126 | **0.557687** | +0.024439 |
+
+The full three-fold EXP003 mean is approximately **0.546269**, improving EXP002 by about **0.019453 RMSE (~3.4%)**. Pre-anchor TWS deltas remain much more important than raw lag levels across all three folds.
+
+## Exact historical test-mask replay
+
+The frozen EXP003 model was then evaluated on the latest exact historical transplant of the real test mask geometry (2009-01 -> 2012-04):
+
+```text
+persistence = 0.714536
+EXP003      = 0.564441
+gain        = +0.150095
+best_iter   = 224
+```
+
+EXP003 improved persistence at every h. The absolute gains grew from **+0.0280 at h1** to roughly **+0.345 at h7**, providing strong evidence that the direct stale-state formulation survives the actual row-level mask geometry rather than only the synthetic direct-h folds.
+
+## Protected recent lockbox opened once
+
+The protected 2013-11 -> 2015-08 lockbox was opened only after EXP003 had been frozen and had passed dev1-dev3 plus the exact replay.
+
+```text
+persistence = 0.823804
+EXP003      = 0.685193
+gain        = +0.138610
+relative    = +16.83%
+best_iter   = 139
+```
+
+EXP003 still beat persistence at every h, but the absolute RMSE was materially worse than dev1-dev3 and the historical replay. The deterioration is already large at h1 (`0.627776`), so the issue is not merely stale-state horizon. Biases are mostly small, arguing against a trivial global bias correction. This is treated as evidence of a genuine late-period/nonstationary difficulty shift.
+
+Decision: **EXP003 remains the structural incumbent, but 0.685 lockbox RMSE is not yet strong enough to justify the first leaderboard submission without one focused attempt to address the shift.**
+
+## EXP004 — 48-month recency weighting: killed
+
+EXP004 changed only the training weights, multiplying the usual horizon-rebalance weight by exponential recency decay with a 48-month half-life. It was tested on dev3 only to avoid repeatedly optimizing against the now-open lockbox.
+
+```text
+EXP003 dev3 = 0.557687
+EXP004 dev3 = 0.556573
+gain        = +0.001114
+relative    = +0.20%
+best_iter   = 334
+```
+
+This is below the predeclared meaningful-improvement threshold and adds complexity while roughly doubling the useful boosting depth. The gain is not large enough to justify promotion.
+
+Decision: **KILL 48-month recency weighting as a primary branch. Do not sweep decay half-lives unless later evidence specifically demands it.**
+
+## EXP005 — causal hydrologic gap-delta ablation
+
+The next controlled experiment keeps EXP003 frozen and adds exactly five features describing how the supplied hydrometeorology changed between the legal TWS anchor month and the current source month:
+
+```text
+SPEI_01_gap_delta
+SPEI_03_gap_delta
+SPEI_06_gap_delta
+SPEI_12_gap_delta
+SOIL_MOISTURE_gap_delta
+```
+
+For each variable:
+
+```text
+gap_delta = current_source_value - value_at_legal_TWS_anchor_month
+```
+
+The joins are exact-calendar and location-specific. No interpolation or row shift is used. For h=1, anchor month equals source month and all five gap deltas must therefore be exactly zero; the feature builder asserts this. For h>1, both endpoints are at or before the source month and are causally legal.
+
+This deliberately tests the smallest useful hidden-interval hydrology signal before attempting richer mean/min/max/trend summaries, which may be unreproducible when intermediate calendar months are absent from the provided panel.
+
+Evaluation policy: **run EXP005 on dev3 first against EXP003 = 0.557687. Do not touch the lockbox. Promote only if the gain is materially larger than EXP004 and is not confined to a single horizon.**

@@ -17,11 +17,14 @@ from src.baselines import predict_persistence
 from src.metrics import score_by_horizon
 from src.ml_features import (
     CORE_FEATURE_COLUMNS,
+    HYDRO_GAP_FEATURE_COLUMNS,
     HYDRO_FEATURE_COLUMNS,
     TWS_HISTORY_FEATURE_COLUMNS,
     SOURCE_CORE_COLUMNS,
     SOURCE_HYDRO_COLUMNS,
+    SOURCE_HYDRO_HISTORY_COLUMNS,
     build_core_feature_matrix,
+    build_hydro_gap_feature_matrix,
     build_hydro_feature_matrix,
     build_tws_history_feature_matrix,
     build_sampled_training_rows,
@@ -87,11 +90,12 @@ def main() -> None:
     parser.add_argument("--early-stopping-rounds", type=int, default=100)
     parser.add_argument(
         "--feature-set",
-        choices=["core", "hydro", "tws_history"],
+        choices=["core", "hydro", "tws_history", "hydro_gap"],
         default="core",
         help=(
             "core=EXP001; hydro=EXP002 fresh SPEI+soil; "
-            "tws_history=EXP003 adds exact-calendar TWS history behind legal anchor"
+            "tws_history=EXP003 adds exact-calendar TWS history behind legal anchor; "
+            "hydro_gap=EXP005 adds current-minus-anchor hydrology deltas"
         ),
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -129,7 +133,7 @@ def main() -> None:
         feature_builder = lambda ledger, sf: build_hydro_feature_matrix(ledger, sf)
         experiment_name = "EXP002"
         model_name = "exp002_fresh_hydro_delta_lgbm"
-    else:
+    elif args.feature_set == "tws_history":
         feature_columns = TWS_HISTORY_FEATURE_COLUMNS
         source_columns = SOURCE_HYDRO_COLUMNS
         feature_builder = lambda ledger, sf: build_tws_history_feature_matrix(
@@ -137,6 +141,14 @@ def main() -> None:
         )
         experiment_name = "EXP003"
         model_name = "exp003_tws_history_delta_lgbm"
+    else:
+        feature_columns = HYDRO_GAP_FEATURE_COLUMNS
+        source_columns = SOURCE_HYDRO_HISTORY_COLUMNS
+        feature_builder = lambda ledger, sf: build_hydro_gap_feature_matrix(
+            ledger, sf, structural
+        )
+        experiment_name = "EXP005"
+        model_name = "exp005_hydro_gap_delta_lgbm"
 
     source_features = raw.loc[:, source_columns].copy()
     labels = raw.loc[:, ["sample_id", "target"]].copy()
