@@ -39,8 +39,10 @@ def _basis(train: pd.DataFrame, cutoff: pd.Period, rank: int) -> tuple[pd.DataFr
     field = field.sort_index().sort_index(axis=1).dropna(axis=1, how="all")
     if field.empty or field.shape[1] < 2:
         return field, np.empty((0, 0)), {"rows": int(len(x)), "cells": int(field.shape[1]), "rank": 0}
-    field = field.ffill().bfill()
+    # Historical location means are fit once; missing prefix months become a
+    # zero anomaly, never an interpolation across time or the eval boundary.
     centered = field - field.mean(axis=0)
+    centered = centered.fillna(0.0)
     u, s, vt = np.linalg.svd(centered.to_numpy(dtype=float), full_matrices=False)
     k = min(rank, vt.shape[0])
     explained = float((s[:k] ** 2).sum() / max((s**2).sum(), 1e-12))
@@ -92,26 +94,42 @@ def main() -> None:
         all_budget.extend({"origin": origin, **r} for r in budget)
         all_blocks.extend({"origin": origin, **r} for r in blocks)
         cutoff = pd.Period(origin, freq="M")
+        field, basis32, meta32 = _basis(train, cutoff, 32)
+        lookup = {tuple(c): i for i, c in enumerate(field.columns)}
         for rank in RANKS:
-            field, basis, meta = _basis(train, cutoff, rank)
-            basis_rows.append({"origin": origin, **meta})
+            basis = basis32[:, : min(rank, basis32.shape[1])] if basis32.size else basis32
+            basis_rows.append({"origin": origin, "rank": rank, **meta32, "rank_used": int(basis.shape[1]) if basis.ndim == 2 else 0})
             if basis.size == 0:
                 continue
-            lookup = {tuple(c): i for i, c in enumerate(field.columns)}
-            loc = [lookup.get((float(a), float(b))) for a, b in zip(oof.lat, oof.lon)]
-            keep = np.array([i is not None for i in loc])
-            if not keep.any():
-                continue
-            residual = (oof.loc[keep, "truth"] - oof.loc[keep, "prediction"]).to_numpy(float)
-            z = residual - residual.mean()
-            design = basis[np.asarray([loc[i] for i in np.flatnonzero(keep)], dtype=int), :]
-            coef, *_ = np.linalg.lstsq(design, z, rcond=None)
-            fitted = design @ coef
-            projections.append({"origin": origin, "rank": rank, "rows": int(keep.sum()), "coverage": float(keep.mean()), "residual_sse": float(np.square(z).sum()), "projected_sse": float(np.square(fitted).sum()), "fraction_residual_sse": float(np.square(fitted).sum() / max(np.square(z).sum(), 1e-12)), "label": "ORACLE_DIAGNOSTIC"})
+            for date, day in oof.groupby("source_date", sort=True):
+                loc = [lookup.get((float(a), float(b))) for a, b in zip(day.lat, day.lon)]
+                keep = np.array([i is not None for i in loc])
+                if not keep.any():
+                    continue
+                residual = (day.loc[keep, "truth"] - day.loc[keep, "prediction"]).to_numpy(float)
+                design = basis[np.asarray([loc[i] for i in np.flatnonzero(keep)], dtype=int), :]
+                coef, *_ = np.linalg.lstsq(design, residual, rcond=None)
+                fitted = design @ coef
+                raw_sse = float(np.square(residual).sum())
+                explained = float(raw_sse - np.square(residual - fitted).sum())
+                projections.append({"origin": origin, "source_date": date, "rank": rank, "rows": int(keep.sum()), "coverage": float(keep.mean()), "raw_sse": raw_sse, "remaining_sse": float(np.square(residual - fitted).sum()), "explained_sse": explained, "fraction_residual_sse": float(explained / max(raw_sse, 1e-12)), "numerical_rank": int(np.linalg.matrix_rank(design)), "condition_number": float(np.linalg.cond(design)) if design.shape[1] else None, "label": "ORACLE_DIAGNOSTIC"})
     pd.DataFrame(all_budget).to_csv(args.output_dir / "error_budget_by_date.csv", index=False)
     pd.DataFrame(all_blocks).to_csv(args.output_dir / "error_budget_by_block.csv", index=False)
     pd.DataFrame(basis_rows).to_csv(args.output_dir / "basis_fit_summary.csv", index=False)
-    pd.DataFrame(projections).to_csv(args.output_dir / "oracle_basis_projection.csv", index=False)
+    proj = pd.DataFrame(projections)
+    proj.to_csv(args.output_dir / "oracle_basis_projection_by_date.csv", index=False)
+    if not proj.empty:
+        agg = proj.groupby(["origin", "rank"], as_index=False).agg(
+            supported_rows=("rows", "sum"), supported_sse=("raw_sse", "sum"),
+            explained_sse=("explained_sse", "sum"), remaining_sse=("remaining_sse", "sum"))
+        agg["supported_opportunity"] = agg["explained_sse"] / agg["supported_sse"].clip(lower=1e-12)
+        all_sse = proj.groupby("origin")["raw_sse"].sum().rename("all_finite_sse")
+        agg = agg.join(all_sse, on="origin")
+        agg["all_finite_opportunity"] = agg["explained_sse"] / agg["all_finite_sse"].clip(lower=1e-12)
+        agg["label"] = "ORACLE_DIAGNOSTIC"
+        agg.to_csv(args.output_dir / "oracle_basis_projection_aggregate.csv", index=False)
+    else:
+        pd.DataFrame().to_csv(args.output_dir / "oracle_basis_projection_aggregate.csv", index=False)
     manifest = {"status": "completed", "phase": "A", "label": "ORACLE_DIAGNOSTIC", "origins": ORIGINS, "ranks": RANKS, "run_dir": str(args.run_dir), "files": {p.name: _sha256(p) for p in args.output_dir.glob("*.csv")}}
     (args.output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(json.dumps({"status": "completed", "output_dir": str(args.output_dir), "projection_rows": len(projections), "label": "ORACLE_DIAGNOSTIC"}))
