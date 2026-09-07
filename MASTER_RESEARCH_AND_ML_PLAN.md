@@ -5,7 +5,7 @@
 **Competition close:** 2026-09-13  
 **Document role:** Canonical research ledger, modeling blueprint, experiment discipline, leakage specification, compute plan, and living decision record for the entire challenge.  
 **First compiled:** 2026-09-07  
-**Current phase:** Research saturation completed; notebook/model training intentionally not started yet.  
+**Current phase:** Research saturation and causal validation infrastructure completed; first target-blind baseline suite scored on dev1–dev3; lockbox remains untouched; first ML model is next.  
 **Local project path:** `C:\dev\zindi\drought`  
 **Git status at first compilation:** Folder exists, but it is not yet initialized as a Git repository and has no remote configured.
 
@@ -2120,6 +2120,126 @@ At that point append:
 - leakage-test results;
 - any discrepancy between expected and observed horizon counts;
 - first accepted/rejected feature hypotheses.
+
+---
+
+# 31. 2026-09-07 — First causal baseline scoring milestone
+
+The first actual forecast scores were produced only after the calendar audit,
+test availability ledger, exact historical mask simulator, and recent direct-horizon
+fold builder all passed locally and on Kaggle.
+
+The newest 18-observed-month block (`2013-11` through `2015-08`) remains an untouched
+lockbox. Baseline development used only dev1–dev3.
+
+## 31.1 Baseline scoring protocol
+
+For every direct-horizon validation example:
+
+- target labels stayed in a separate table;
+- `h=1..7` anchors were calendar-aligned as `target_month - h`;
+- no `h>1` example used source-month TWS;
+- fold-fitted harmonic/trend artifacts used only raw TWS observations strictly
+  before the validation source block;
+- headline score was `sqrt(sum_h q_h * MSE_h)` with exact test row weights;
+- the lockbox was not requested or scored.
+
+## 31.2 Weighted RMSE results
+
+| Model | dev1 | dev2 | dev3 | Mean dev RMSE |
+|---|---:|---:|---:|---:|
+| **Persistence** | **0.628228** | **0.696437** | **0.684559** | **0.669741** |
+| Seasonal-anomaly persistence (`rho=1`) | 0.676381 | 0.718577 | 0.710663 | 0.701874 |
+| Harmonic + trend, persistence fallback | 0.897400 | 0.990534 | 0.950495 | 0.946143 |
+| Lag-12 seasonal naive, persistence fallback | 0.849777 | 1.061902 | 0.946639 | 0.952773 |
+
+Persistence won **all three** development folds.
+
+## 31.3 Persistence horizon behavior
+
+### dev1
+
+```text
+h1 0.5162
+h2 0.6164
+h3 0.6678
+h4 0.6916
+h5 0.7134
+h6 0.7572
+h7 0.7855
+```
+
+### dev2
+
+```text
+h1 0.5385
+h2 0.6584
+h3 0.7367
+h4 0.7946
+h5 0.8403
+h6 0.8910
+h7 0.9380
+```
+
+### dev3
+
+```text
+h1 0.5563
+h2 0.6631
+h3 0.7403
+h4 0.7539
+h5 0.7890
+h6 0.8187
+h7 0.8697
+```
+
+The intended difficulty pattern is clearly visible: error generally rises with TWS
+age. This is another validation sanity check and reinforces the need for an explicit
+horizon-aware model rather than optimizing only one-step forecasting.
+
+## 31.4 Decisions from the baseline experiment
+
+### KEEP — persistence as the incumbent baseline
+
+Persistence is now the score every serious model must beat, both overall and by
+horizon. It is especially strong at h=1 and remains competitive even at h=7.
+
+### KILL as standalone model — lag-12 seasonal naive
+
+Lag-12 was substantially worse in every fold. Do not spend tuning budget on pure
+same-month-last-year forecasting.
+
+Its existence as a potential **input feature** is not ruled out; a nonlinear model
+may learn to use it only in the locations/seasons where it is genuinely useful.
+
+### KILL as standalone model — raw harmonic + trend forecast
+
+Per-location linear trend + annual + semiannual harmonics were far worse than
+persistence. Do not treat the deterministic structural fit as a main predictor.
+
+However, the research reason for retaining trend/seasonal structure still stands:
+trees do not extrapolate time trends cleanly. Harmonic/trend outputs or anomalies may
+still be tested later as **features/residual references**, but only through controlled
+ablation.
+
+### KILL as standalone model — unshrunk seasonal-anomaly persistence
+
+Persisting the latest anomaly around the structural harmonic/trend baseline (`rho=1`)
+was consistently worse than raw TWS persistence. Do not add horizon-specific `rho_h`
+tuning yet; the base formulation has not earned extra degrees of freedom.
+
+## 31.5 Important interpretation
+
+These results strongly support the original direct-residual plan:
+
+> The problem is dominated by a strong stale TWS state anchor, and useful models
+> should learn the **change away from persistence** using horizon, recent legal TWS
+> history, and fresh hydrometeorological forcing rather than replacing the anchor
+> with a standalone seasonal model.
+
+The next promoted experiment is therefore the first pooled horizon-aware residual
+model, beginning with a deliberately small feature set before causal-history and
+hydrologic-gap features are added.
 
 ---
 
