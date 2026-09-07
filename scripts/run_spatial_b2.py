@@ -12,11 +12,12 @@ ORIGINS=("2007-09","2009-01","2014-12"); RANKS=(8,16)
 HYDRO=("SPEI_01_t","SPEI_03_t","SPEI_06_t","SPEI_12_t","SOIL_MOISTURE_t")
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--data-dir',type=Path,required=True); ap.add_argument('--run-dir',type=Path,required=True); ap.add_argument('--output-dir',type=Path,required=True); ap.add_argument('--expected-commit',required=True); a=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--data-dir',type=Path,required=True); ap.add_argument('--run-dir',type=Path,required=True); ap.add_argument('--output-dir',type=Path,required=True); ap.add_argument('--expected-commit',required=True); ap.add_argument('--origins',default=','.join(ORIGINS)); a=ap.parse_args()
     head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if head!=a.expected_commit: raise RuntimeError((head,a.expected_commit))
     a.output_dir.mkdir(parents=True,exist_ok=False); train=pd.read_csv(a.data_dir/'Train.csv'); started=time.perf_counter(); results=[]
-    for origin in ORIGINS:
+    origins=tuple(x for x in a.origins.split(',') if x in ORIGINS)
+    for origin in origins:
         op=a.run_dir/f'oof_{origin}_r01_lgbm.csv.gz'
         if not op.exists(): continue
         oof=pd.read_csv(op); oof=oof.loc[oof.h.between(1,7)].reset_index(drop=True); oof['source_date']=pd.to_datetime(oof.source_date).dt.to_period('M')
@@ -45,5 +46,5 @@ def main():
                 preds.append(float(row.anchor_tws + (u[loc]@dz if loc is not None else row.prediction-row.anchor_tws))); truth.append(row.truth)
             pred=np.asarray(preds); y=np.asarray(truth); results.append({'origin':origin,'rank':rank,'rows':len(y),'raw_rmse':float(np.sqrt(np.mean((pred-y)**2))),'mae':float(np.mean(np.abs(pred-y))),'bias':float(np.mean(pred-y)),'r01_rmse':float(np.sqrt(np.mean((oof.prediction.to_numpy()-y)**2))),'ridge_alpha':10.0,'training_months':len(periods),'label':'B2_DEPLOYABLE_SCREEN'})
             pd.DataFrame({'sample_id':oof.sample_id,'source_date':oof.source_date.astype(str),'h':oof.h,'truth':y,'prediction':pred,'r01_prediction':oof.prediction,'origin':origin,'rank':rank}).to_csv(a.output_dir/f'oof_{origin}_b2_rank{rank}.csv.gz',index=False,compression='gzip')
-    pd.DataFrame(results).to_csv(a.output_dir/'metrics.csv',index=False); manifest={'status':'completed','stage':'B2','label':'B2_DEPLOYABLE_SCREEN','commit':head,'origins':ORIGINS,'ranks':RANKS,'no_test_predictions':True,'elapsed_seconds':time.perf_counter()-started}; (a.output_dir/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8'); print(json.dumps({'status':'completed','rows':len(results),'output_dir':str(a.output_dir)}))
+    pd.DataFrame(results).to_csv(a.output_dir/'metrics.csv',index=False); manifest={'status':'completed','stage':'B2','label':'B2_DEPLOYABLE_SCREEN','commit':head,'origins':origins,'ranks':RANKS,'no_test_predictions':True,'elapsed_seconds':time.perf_counter()-started}; (a.output_dir/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8'); print(json.dumps({'status':'completed','rows':len(results),'output_dir':str(a.output_dir)}))
 if __name__=='__main__': main()
