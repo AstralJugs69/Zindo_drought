@@ -94,11 +94,19 @@ def main() -> None:
         all_budget.extend({"origin": origin, **r} for r in budget)
         all_blocks.extend({"origin": origin, **r} for r in blocks)
         cutoff = pd.Period(origin, freq="M")
-        field, basis32, meta32 = _basis(train, cutoff, 32)
+        field, basis32, _meta32 = _basis(train, cutoff, 32)
         lookup = {tuple(c): i for i, c in enumerate(field.columns)}
         for rank in RANKS:
             basis = basis32[:, : min(rank, basis32.shape[1])] if basis32.size else basis32
-            basis_rows.append({"origin": origin, "rank": rank, **meta32, "rank_used": int(basis.shape[1]) if basis.ndim == 2 else 0})
+            rank_used = int(basis.shape[1]) if basis.ndim == 2 else 0
+            requested_meta = dict(_meta32)
+            requested_meta["rank"] = rank_used
+            requested_meta["requested_rank"] = rank
+            if basis32.size and rank_used:
+                _, _, requested_meta = _basis(train, cutoff, rank)
+                requested_meta["requested_rank"] = rank
+                requested_meta["rank_used"] = rank_used
+            basis_rows.append({"origin": origin, **requested_meta})
             if basis.size == 0:
                 continue
             for date, day in oof.groupby("source_date", sort=True):
@@ -123,7 +131,13 @@ def main() -> None:
             supported_rows=("rows", "sum"), supported_sse=("raw_sse", "sum"),
             explained_sse=("explained_sse", "sum"), remaining_sse=("remaining_sse", "sum"))
         agg["supported_opportunity"] = agg["explained_sse"] / agg["supported_sse"].clip(lower=1e-12)
-        all_sse = proj.groupby("origin")["raw_sse"].sum().rename("all_finite_sse")
+        # Denominator is computed once from every finite OOF residual, including
+        # locations unsupported by the historical basis and without repeating it
+        # for each requested rank/date projection.
+        # Reconstruct from the emitted per-date error budget, which covers all
+        # finite OOF rows exactly once.
+        budget_df = pd.DataFrame(all_budget)
+        all_sse = budget_df.groupby("origin")["sse"].sum().rename("all_finite_sse")
         agg = agg.join(all_sse, on="origin")
         agg["all_finite_opportunity"] = agg["explained_sse"] / agg["all_finite_sse"].clip(lower=1e-12)
         agg["label"] = "ORACLE_DIAGNOSTIC"
