@@ -2922,3 +2922,37 @@ EXP006 keeps every EXP005 feature and adds exactly one new spatial feature: a ca
 Rationale: the same ~15.7k spatial locations recur throughout the panel and are also present in test. Continuous latitude/longitude force trees to approximate location-specific structure with axis-aligned geographic partitions. A native categorical location feature gives LightGBM a cheap way to learn groups of locations with similar residual response without the compute and implementation cost of the planned EOF/PCA branch.
 
 Evaluation policy: **run EXP006 on dev3 first against EXP005 = 0.553415. Promote only for a material gain; do not touch the lockbox.**
+
+## 2026-09-07 — EXP006 categorical location identity: killed
+
+Kaggle tested EXP006 on dev3 with EXP005 otherwise frozen:
+
+```text
+EXP005 dev3 = 0.553415
+EXP006 dev3 = 0.555320
+change      = -0.001905 (worse)
+best_iter   = 113
+```
+
+The exact categorical location identifier received nonzero gain importance, but it did not improve out-of-period RMSE. Performance deteriorated most clearly at longer horizons (for example h7 rose from `0.632098` under EXP005 to `0.637959`). This suggests that memorizing exact grid identity is not a useful substitute for a smoother/low-rank spatial representation.
+
+Decision: **KILL EXP006. Do not test dev1/dev2 and do not carry `location_id` into later incumbents.**
+
+## EXP007 — fold-causal rank-8 EOF spatial embedding ablation
+
+EXP007 returns to the planned low-rank spatial branch. It keeps every EXP005 feature and adds eight static location loadings from an EOF/SVD decomposition of historical TWS fields.
+
+Critical causality rule: for each validation fold, the EOF basis is fit **only on source-month TWS fields available inside that fold's training prefix**. If the fold's latest legal training target month is `c`, the EOF fit stops at source month `c-1`; validation-period TWS never participates. The decomposition receives no target column.
+
+Implementation details:
+
+- exact `(lat, lon)` grid columns;
+- TWS fields centered by each location's training-prefix mean;
+- missing location/month cells are replaced by that same training-prefix location mean before centering, giving zero anomaly rather than temporal interpolation;
+- rank fixed at **8** for the first ablation;
+- SVD loading signs canonicalized for deterministic reruns;
+- only the eight location loadings are added to EXP005; no EOF coefficient forecast or reconstructed TWS is used yet.
+
+Rationale: EXP006 showed that exact location memorization is not helpful, but that does not falsify spatial structure. EOF loadings provide a smooth low-dimensional description of locations that historically co-move in TWS and should be much less prone to identity overfit than a 15.7k-level categorical feature.
+
+Evaluation policy: **run EXP007 on dev3 first against EXP005 = 0.553415. Do not revisit the lockbox. Promote only for a clear gain; otherwise stop adding static spatial encodings and move to the next temporal/training-formulation experiment.**

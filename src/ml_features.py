@@ -86,12 +86,24 @@ HYDRO_GAP_FEATURE_COLUMNS = TWS_HISTORY_FEATURE_COLUMNS + [
 
 LOCATION_CAT_FEATURE_COLUMNS = HYDRO_GAP_FEATURE_COLUMNS + ["location_id"]
 
+EOF_RANK = 8
+EOF_FEATURE_COLUMNS = HYDRO_GAP_FEATURE_COLUMNS + [
+    f"eof_loading_{i}" for i in range(1, EOF_RANK + 1)
+]
+
 
 @dataclass(frozen=True)
 class SampledTrainingRows:
     rows: pd.DataFrame
     horizon_counts: dict[int, int]
     dropped_missing_anchor: int
+
+
+@dataclass(frozen=True)
+class EOFLocationFeatures:
+    loadings: pd.DataFrame
+    explained_variance_ratio: tuple[float, ...]
+    n_months: int
 
 
 def _assert_target_blind(frame: pd.DataFrame, name: str) -> None:
@@ -543,6 +555,147 @@ def build_location_cat_feature_matrix(
 
     out["location_id"] = ids.to_numpy(dtype=np.int32)
     out = out.loc[:, LOCATION_CAT_FEATURE_COLUMNS]
+    return out.reset_index(drop=True)
+
+
+def fit_eof_location_features(
+    structural: pd.DataFrame,
+    *,
+    max_source_month: str | pd.Period,
+    rank: int = EOF_RANK,
+) -> EOFLocationFeatures:
+    """Fit fold-causal EOF loadings from historical TWS fields only.
+
+    The fit uses source-month TWS rows at or before ``max_source_month`` and never
+    receives a target column. Missing location/month values are replaced by that
+    location's historical mean *inside the fit prefix*; after centering, this is
+    equivalent to a zero anomaly and does not interpolate temporal state.
+
+    The returned right-singular vectors are static location embeddings. Their signs
+    are canonicalized for deterministic reruns. They are intended as low-rank spatial
+    descriptors, not as reconstructed future TWS values.
+    """
+    _assert_target_blind(structural, "structural")
+    required = {"time", "lat", "lon", "TWS_t"}
+    missing = required.difference(structural.columns)
+    if missing:
+        raise ValueError(f"Missing structural columns for EOF fit: {sorted(missing)}")
+    if rank < 1:
+        raise ValueError("EOF rank must be >= 1")
+
+    cutoff = pd.Period(max_source_month, freq="M")
+    state = structural.loc[:, ["time", "lat", "lon", "TWS_t"]].copy()
+    state["source_period"] = pd.to_datetime(state["time"]).dt.to_period("M")
+    state = state.loc[state["source_period"] <= cutoff].copy()
+    if state.empty:
+        raise AssertionError(f"No TWS rows available for EOF fit through {cutoff}")
+    if state.duplicated(["source_period", "lat", "lon"]).any():
+        raise AssertionError("EOF fit state is not unique by month/location")
+
+    locations = (
+        structural.loc[:, ["lat", "lon"]]
+        .drop_duplicates()
+        .sort_values(["lat", "lon"], kind="mergesort")
+        .reset_index(drop=True)
+    )
+    location_index = pd.MultiIndex.from_frame(locations[["lat", "lon"]])
+
+    field = state.pivot(
+        index="source_period",
+        columns=["lat", "lon"],
+        values="TWS_t",
+    ).sort_index()
+    field = field.reindex(columns=location_index)
+
+    matrix = field.to_numpy(dtype=np.float32)
+    finite = np.isfinite(matrix)
+    counts = finite.sum(axis=0)
+    sums = np.where(finite, matrix, 0.0).sum(axis=0, dtype=np.float64)
+    means = np.divide(
+        sums,
+        counts,
+        out=np.zeros(matrix.shape[1], dtype=np.float64),
+        where=counts > 0,
+    ).astype(np.float32)
+    filled = np.where(finite, matrix, means[None, :]).astype(np.float32, copy=False)
+    centered = filled - means[None, :]
+
+    max_rank = min(centered.shape)
+    if rank > max_rank:
+        raise ValueError(f"EOF rank {rank} exceeds available matrix rank bound {max_rank}")
+
+    _, singular_values, vt = np.linalg.svd(centered, full_matrices=False)
+    loadings = vt[:rank].T.astype(np.float32, copy=True)
+
+    # SVD signs are mathematically arbitrary. Canonicalize each component so the
+    # largest-magnitude loading is positive, which improves reproducibility.
+    for j in range(rank):
+        pivot_idx = int(np.argmax(np.abs(loadings[:, j])))
+        if loadings[pivot_idx, j] < 0:
+            loadings[:, j] *= -1.0
+
+    energy = np.square(singular_values.astype(np.float64))
+    total_energy = float(energy.sum())
+    if total_energy > 0:
+        explained = tuple(float(v / total_energy) for v in energy[:rank])
+    else:
+        explained = tuple(0.0 for _ in range(rank))
+
+    loading_frame = locations.copy()
+    for j in range(rank):
+        loading_frame[f"eof_loading_{j + 1}"] = loadings[:, j]
+
+    if loading_frame[[f"eof_loading_{i}" for i in range(1, rank + 1)]].isna().any().any():
+        raise AssertionError("EOF location loadings contain missing values")
+
+    return EOFLocationFeatures(
+        loadings=loading_frame,
+        explained_variance_ratio=explained,
+        n_months=int(centered.shape[0]),
+    )
+
+
+def build_eof_feature_matrix(
+    ledger: pd.DataFrame,
+    source_features: pd.DataFrame,
+    structural: pd.DataFrame,
+    eof_locations: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build EXP007 = EXP005 plus fold-causal static EOF location loadings."""
+    _assert_target_blind(ledger, "ledger")
+    _assert_target_blind(source_features, "source_features")
+    _assert_target_blind(structural, "structural")
+    _assert_target_blind(eof_locations, "eof_locations")
+
+    out = build_hydro_gap_feature_matrix(ledger, source_features, structural)
+    loading_cols = [f"eof_loading_{i}" for i in range(1, EOF_RANK + 1)]
+    required = {"lat", "lon", *loading_cols}
+    missing = required.difference(eof_locations.columns)
+    if missing:
+        raise ValueError(f"Missing EOF location columns: {sorted(missing)}")
+    if eof_locations.duplicated(["lat", "lon"]).any():
+        raise AssertionError("EOF location table is not unique by location")
+
+    left = ledger.loc[:, ["lat", "lon"]].copy()
+    left["_order"] = np.arange(len(left), dtype=np.int64)
+    joined = left.merge(
+        eof_locations.loc[:, ["lat", "lon", *loading_cols]],
+        how="left",
+        on=["lat", "lon"],
+        validate="many_to_one",
+        sort=False,
+    ).sort_values("_order")
+    if joined[loading_cols].isna().any().any():
+        raise AssertionError("Missing EOF loading for one or more examples")
+
+    for col in loading_cols:
+        out[col] = joined[col].to_numpy(dtype=np.float32)
+    out = out.loc[:, EOF_FEATURE_COLUMNS].astype(
+        {c: ("int8" if c == "h" else "float32") for c in EOF_FEATURE_COLUMNS}
+    )
+    values = out.to_numpy(dtype=np.float32)
+    if np.isinf(values).any():
+        raise AssertionError("EOF feature matrix contains infinite values")
     return out.reset_index(drop=True)
 
 

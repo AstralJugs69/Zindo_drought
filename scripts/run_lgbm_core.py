@@ -17,6 +17,8 @@ from src.baselines import predict_persistence
 from src.metrics import score_by_horizon
 from src.ml_features import (
     CORE_FEATURE_COLUMNS,
+    EOF_FEATURE_COLUMNS,
+    EOF_RANK,
     HYDRO_GAP_FEATURE_COLUMNS,
     HYDRO_FEATURE_COLUMNS,
     LOCATION_CAT_FEATURE_COLUMNS,
@@ -25,10 +27,12 @@ from src.ml_features import (
     SOURCE_HYDRO_COLUMNS,
     SOURCE_HYDRO_HISTORY_COLUMNS,
     build_core_feature_matrix,
+    build_eof_feature_matrix,
     build_hydro_gap_feature_matrix,
     build_hydro_feature_matrix,
     build_location_cat_feature_matrix,
     build_tws_history_feature_matrix,
+    fit_eof_location_features,
     build_sampled_training_rows,
     horizon_rebalance_weights,
     validation_horizon_weights,
@@ -92,13 +96,14 @@ def main() -> None:
     parser.add_argument("--early-stopping-rounds", type=int, default=100)
     parser.add_argument(
         "--feature-set",
-        choices=["core", "hydro", "tws_history", "hydro_gap", "location_cat"],
+        choices=["core", "hydro", "tws_history", "hydro_gap", "location_cat", "eof"],
         default="core",
         help=(
             "core=EXP001; hydro=EXP002 fresh SPEI+soil; "
             "tws_history=EXP003 adds exact-calendar TWS history behind legal anchor; "
             "hydro_gap=EXP005 adds current-minus-anchor hydrology deltas; "
-            "location_cat=EXP006 adds categorical location identity"
+            "location_cat=EXP006 adds categorical location identity; "
+            "eof=EXP007 adds rank-8 fold-causal EOF location loadings"
         ),
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -156,7 +161,7 @@ def main() -> None:
         experiment_name = "EXP005"
         model_name = "exp005_hydro_gap_delta_lgbm"
         categorical_features = []
-    else:
+    elif args.feature_set == "location_cat":
         feature_columns = LOCATION_CAT_FEATURE_COLUMNS
         source_columns = SOURCE_HYDRO_HISTORY_COLUMNS
         feature_builder = lambda ledger, sf: build_location_cat_feature_matrix(
@@ -165,6 +170,13 @@ def main() -> None:
         experiment_name = "EXP006"
         model_name = "exp006_location_cat_delta_lgbm"
         categorical_features = ["location_id"]
+    else:
+        feature_columns = EOF_FEATURE_COLUMNS
+        source_columns = SOURCE_HYDRO_HISTORY_COLUMNS
+        feature_builder = None
+        experiment_name = "EXP007"
+        model_name = "exp007_eof_spatial_delta_lgbm"
+        categorical_features = []
 
     source_features = raw.loc[:, source_columns].copy()
     labels = raw.loc[:, ["sample_id", "target"]].copy()
@@ -190,6 +202,29 @@ def main() -> None:
             months,
         )
 
+        eof_report = None
+        fold_feature_builder = feature_builder
+        if args.feature_set == "eof":
+            eof_max_source = fold.max_training_target_month - 1
+            eof_fit = fit_eof_location_features(
+                structural,
+                max_source_month=eof_max_source,
+                rank=EOF_RANK,
+            )
+            fold_feature_builder = lambda ledger, sf, ef=eof_fit: build_eof_feature_matrix(
+                ledger,
+                sf,
+                structural,
+                ef.loadings,
+            )
+            eof_report = {
+                "fit_through_source_month": str(eof_max_source),
+                "rank": EOF_RANK,
+                "fit_months": eof_fit.n_months,
+                "explained_variance_ratio": list(eof_fit.explained_variance_ratio),
+                "explained_variance_cumulative": float(sum(eof_fit.explained_variance_ratio)),
+            }
+
         sampled = build_sampled_training_rows(
             structural,
             source_features.loc[:, SOURCE_CORE_COLUMNS],
@@ -197,11 +232,11 @@ def main() -> None:
             seed=args.seed,
         )
         train_rows = sampled.rows
-        X_train = feature_builder(train_rows, source_features)
+        X_train = fold_feature_builder(train_rows, source_features)
         y_train_delta, _ = _attach_labels(train_rows, labels)
         train_weight = horizon_rebalance_weights(train_rows["h"])
 
-        X_valid = feature_builder(fold.ledger, source_features)
+        X_valid = fold_feature_builder(fold.ledger, source_features)
         y_valid = _validation_labels(fold)
         y_valid_delta = y_valid - fold.ledger["last_observed_TWS"].to_numpy(dtype=np.float32)
         valid_weight = validation_horizon_weights(fold.ledger["h"])
@@ -221,6 +256,8 @@ def main() -> None:
             "feature_columns": feature_columns,
             "persistence_weighted_rmse": float(persistence_score),
         }
+        if eof_report is not None:
+            prep_report["eof_fit"] = eof_report
         print(f"\n=== {fold_name.upper()} PREP ===")
         print(json.dumps(prep_report, indent=2))
 
