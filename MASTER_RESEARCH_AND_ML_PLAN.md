@@ -2123,6 +2123,81 @@ At that point append:
 
 ---
 
+# 31. Implementation progress — recent direct-horizon validation folds
+
+## 2026-09-07 — Recent h=1…7 fold builder validated
+
+The exact test-calendar replay is faithful but cannot be shifted beyond 2012-04 because later GRACE source-month presence differs from the test calendar. To preserve recent nonstationarity coverage, a second validation mode was implemented: **direct-horizon folds**.
+
+For every validation source row at month `t` and every `h in {1,…,7}` where a legal historical TWS anchor exists, the builder constructs:
+
+```text
+target month      = t + 1 calendar month
+legal TWS anchor  = target month - h calendar months
+current exogenous = source month t (joined later from an explicit allow-list)
+raw source TWS    = unavailable for h > 1
+```
+
+The label table remains physically separate from the feature/availability ledger.
+
+### Fixed observed-source-month blocks
+
+The most recent 72 observed train source months were divided into four non-overlapping 18-observed-month blocks:
+
+| Fold | Source start | Source end | First target month | Max fit-label month | Role |
+|---|---|---|---|---|---|
+| dev1 | 2008-04 | 2009-09 | 2008-05 | 2008-04 | development |
+| dev2 | 2009-10 | 2011-05 | 2009-11 | 2009-10 | development |
+| dev3 | 2011-08 | 2013-07 | 2011-09 | 2011-08 | development |
+| lockbox | 2013-11 | 2015-08 | 2013-12 | 2013-11 | final untouched recent check |
+
+These blocks are defined over **observed source months**, not naive continuous calendar slices, because the GRACE record has genuine missing calendar months.
+
+### Structural audit results
+
+All four fold ledgers passed:
+
+- h range exactly 1…7;
+- zero `target` columns in the ledger;
+- zero h>1 examples using source-month TWS;
+- unique synthetic `example_id` values;
+- strict chronological separation between folds;
+- all 15,715 locations represented in each fold.
+
+Validation-example counts and minimum legal-anchor coverage across h:
+
+| Fold | Source rows | Synthetic examples | Minimum h-anchor coverage |
+|---|---:|---:|---:|
+| dev1 | 280,719 | 1,958,165 | 99.54% |
+| dev2 | 280,836 | 1,863,166 | 88.32% |
+| dev3 | 280,936 | 1,461,621 | 55.29% |
+| lockbox | 281,062 | 1,524,917 | 60.86% |
+
+Coverage falls in later periods because some required historical anchor calendar months do not exist in the GRACE source-row record. These rows are **dropped**, not imputed with future information or silently assigned a longer stale horizon.
+
+This means the recent direct-horizon validator should score each h separately and combine horizon MSEs using the exact test weights. It should not compare raw pooled row counts across h as though every anchor were equally observable historically.
+
+### Current validation architecture
+
+The project now has two complementary causal validation modes:
+
+1. **Exact historical test-template replay** — closest match to real test row/mask geometry, but limited to older history through 2012-04.
+2. **Recent direct-horizon folds** — covers the newest train years and explicitly constructs legal h=1…7 anchors, but cannot reproduce every row-level historical availability detail of the real test mask.
+
+Serious model promotion should use both modes rather than trusting either one alone.
+
+### Next implementation task
+
+Build the score layer and baseline runner:
+
+1. exact test-h weighted RMSE;
+2. persistence from `last_observed_TWS`;
+3. lag-12/seasonal naive where legal;
+4. harmonic + linear trend baseline;
+5. report RMSE by fold and h before any GBDT training.
+
+---
+
 # 31. 2026-09-07 — Historical mask simulator implementation checkpoint
 
 The first exact historical replay of the real test mask geometry has now been implemented and audited.

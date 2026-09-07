@@ -190,3 +190,152 @@ def build_exact_historical_mask_fold(
         end_month=end,
         dropped_missing_anchor=dropped_missing_anchor,
     )
+
+
+@dataclass(frozen=True)
+class DirectHorizonFold:
+    ledger: pd.DataFrame
+    labels: pd.DataFrame
+    source_months: pd.PeriodIndex
+    source_start: pd.Period
+    source_end: pd.Period
+    first_target_month: pd.Period
+    max_training_target_month: pd.Period
+
+
+def recent_observed_month_blocks(
+    train: pd.DataFrame,
+    *,
+    block_size: int = 18,
+    n_blocks: int = 4,
+) -> list[pd.PeriodIndex]:
+    """Split the most recent observed train source months into fixed-size blocks.
+
+    Blocks are defined over observed source months, not naive calendar ranges, because
+    GRACE has missing calendar months. The newest block is intended to be a lockbox.
+    """
+    if "time" not in train.columns:
+        raise ValueError("train must contain time")
+    months = pd.PeriodIndex(
+        pd.to_datetime(train["time"]).dt.to_period("M").drop_duplicates()
+    ).sort_values()
+    needed = block_size * n_blocks
+    if len(months) < needed:
+        raise ValueError(f"Need at least {needed} observed source months, found {len(months)}")
+    tail = months[-needed:]
+    return [
+        tail[i * block_size : (i + 1) * block_size]
+        for i in range(n_blocks)
+    ]
+
+
+def build_direct_horizon_fold(
+    train: pd.DataFrame,
+    source_months: pd.PeriodIndex | list[pd.Period] | list[str],
+    *,
+    horizons: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7),
+) -> DirectHorizonFold:
+    """Create recent causal h=1..7 validation examples without exact mask replay.
+
+    For source month t and horizon h, the legal TWS anchor is calendar month
+    (t+1-h). Current/source-month exogenous features remain legal and are joined
+    later by sample_id from an explicit exogenous allow-list. Raw source-month TWS
+    is deliberately absent from the ledger when h>1, preventing hidden-state use.
+
+    Labels are returned in a separate table and never enter the ledger.
+    """
+    required = {"sample_id", "time", "lat", "lon", "TWS_t", "target"}
+    missing = required.difference(train.columns)
+    if missing:
+        raise ValueError(f"Missing required train columns: {sorted(missing)}")
+
+    months = pd.PeriodIndex(source_months, freq="M").sort_values()
+    if len(months) == 0:
+        raise ValueError("source_months cannot be empty")
+    if len(set(horizons)) != len(horizons) or min(horizons) < 1:
+        raise ValueError("horizons must be unique positive integers")
+
+    state = train.loc[:, ["sample_id", "time", "lat", "lon", "TWS_t", "target"]].copy()
+    state["source_date"] = pd.to_datetime(state["time"])
+    state["source_period"] = state["source_date"].dt.to_period("M")
+
+    val = state.loc[state["source_period"].isin(months)].copy()
+    if val.empty:
+        raise AssertionError("Direct-horizon fold selected no validation rows")
+
+    anchor = state.loc[:, ["lat", "lon", "source_period", "TWS_t"]].rename(
+        columns={"source_period": "anchor_period", "TWS_t": "anchor_tws"}
+    )
+
+    pieces: list[pd.DataFrame] = []
+    label_pieces: list[pd.DataFrame] = []
+    for h in horizons:
+        x = val.loc[:, ["sample_id", "source_date", "source_period", "lat", "lon", "target"]].copy()
+        x["h"] = np.int8(h)
+        x["target_date"] = x["source_date"] + pd.offsets.MonthBegin(1)
+        x["anchor_period"] = x["source_period"].map(lambda p: p + (1 - h))
+        x = x.merge(
+            anchor,
+            how="left",
+            on=["lat", "lon", "anchor_period"],
+            validate="many_to_one",
+        )
+        x = x.loc[x["anchor_tws"].notna()].copy()
+        if x.empty:
+            continue
+
+        x["example_id"] = x["sample_id"].astype(str) + "__h" + str(h)
+        label_pieces.append(x.loc[:, ["example_id", "sample_id", "h", "target"]].copy())
+        x = x.drop(columns=["target"])
+        x["last_observed_date"] = x["anchor_period"].dt.to_timestamp(how="start")
+        x["last_observed_TWS"] = x["anchor_tws"]
+        x["sim_tws_visible"] = (h == 1)
+        pieces.append(x)
+
+    if not pieces:
+        raise AssertionError("No direct-horizon examples could be constructed")
+
+    ledger = pd.concat(pieces, ignore_index=True)
+    labels = pd.concat(label_pieces, ignore_index=True)
+
+    # Structural assertions.
+    expected_anchor = [
+        p + (1 - int(h))
+        for p, h in zip(ledger["source_period"], ledger["h"])
+    ]
+    if not np.all(ledger["anchor_period"].to_numpy() == np.asarray(expected_anchor, dtype=object)):
+        raise AssertionError("Anchor calendar alignment is incorrect")
+    if "target" in ledger.columns:
+        raise AssertionError("Target leaked into direct-horizon validation ledger")
+    if ledger["example_id"].duplicated().any():
+        raise AssertionError("Direct-horizon example_id is not unique")
+    if not set(ledger["h"].unique()).issubset(set(horizons)):
+        raise AssertionError("Unexpected horizon in direct-horizon ledger")
+    hidden_self_use = (ledger["h"] > 1) & (ledger["last_observed_date"] == ledger["source_date"])
+    if hidden_self_use.any():
+        raise AssertionError(f"Found {int(hidden_self_use.sum())} h>1 rows using source-month TWS")
+
+    ledger["location_id"] = ledger.groupby(["lat", "lon"], sort=True).ngroup()
+    ledger_cols = [
+        "example_id", "sample_id", "source_date", "target_date",
+        "source_period", "lat", "lon", "location_id", "h",
+        "sim_tws_visible", "last_observed_date", "last_observed_TWS",
+    ]
+    ledger = ledger.loc[:, ledger_cols].sort_values(["source_date", "h", "lat", "lon"], kind="mergesort").reset_index(drop=True)
+    labels = labels.set_index("example_id").loc[ledger["example_id"]].reset_index()
+
+    source_start = months.min()
+    source_end = months.max()
+    first_target_month = source_start + 1
+    # Training rows must have label/target month strictly before the validation target future.
+    max_training_target_month = source_start
+
+    return DirectHorizonFold(
+        ledger=ledger,
+        labels=labels,
+        source_months=months,
+        source_start=source_start,
+        source_end=source_end,
+        first_target_month=first_target_month,
+        max_training_target_month=max_training_target_month,
+    )
