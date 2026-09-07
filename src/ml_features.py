@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -18,6 +18,31 @@ CORE_FEATURE_COLUMNS = [
 ]
 
 SOURCE_CORE_COLUMNS = ["sample_id", "month_sin", "month_cos"]
+
+HYDRO_FEATURE_COLUMNS = [
+    "last_observed_TWS",
+    "h",
+    "lat",
+    "lon",
+    "month_sin",
+    "month_cos",
+    "SPEI_01_t",
+    "SPEI_03_t",
+    "SPEI_06_t",
+    "SPEI_12_t",
+    "SOIL_MOISTURE_t",
+]
+
+SOURCE_HYDRO_COLUMNS = [
+    "sample_id",
+    "month_sin",
+    "month_cos",
+    "SPEI_01_t",
+    "SPEI_03_t",
+    "SPEI_06_t",
+    "SPEI_12_t",
+    "SOIL_MOISTURE_t",
+]
 
 
 @dataclass(frozen=True)
@@ -188,6 +213,59 @@ def build_core_feature_matrix(
     )
     if not np.isfinite(out.to_numpy(dtype=np.float32)).all():
         raise AssertionError("Core feature matrix contains non-finite values")
+    return out.reset_index(drop=True)
+
+
+def build_hydro_feature_matrix(
+    ledger: pd.DataFrame,
+    source_features: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build EXP002 features using fresh source-month hydrometeorology.
+
+    TWS state remains restricted to the exact legal historical anchor in the
+    ledger. SPEI, soil moisture, and calendar variables are joined from the
+    current source row by sample_id, so they remain fresh even when TWS is stale.
+    The function is deliberately target-blind.
+    """
+    _assert_target_blind(ledger, "ledger")
+    _assert_target_blind(source_features, "source_features")
+    required = {"sample_id", "last_observed_TWS", "h", "lat", "lon"}
+    missing = required.difference(ledger.columns)
+    if missing:
+        raise ValueError(f"Missing ledger columns: {sorted(missing)}")
+    missing_source = set(SOURCE_HYDRO_COLUMNS).difference(source_features.columns)
+    if missing_source:
+        raise ValueError(f"Missing hydro source feature columns: {sorted(missing_source)}")
+    if source_features["sample_id"].duplicated().any():
+        raise AssertionError("source_features sample_id must be unique")
+
+    left = ledger.loc[:, ["sample_id", "last_observed_TWS", "h", "lat", "lon"]].copy()
+    left["_order"] = np.arange(len(left), dtype=np.int64)
+    x = left.merge(
+        source_features.loc[:, SOURCE_HYDRO_COLUMNS],
+        how="left",
+        on="sample_id",
+        validate="many_to_one",
+        sort=False,
+    ).sort_values("_order")
+
+    out = x.loc[:, HYDRO_FEATURE_COLUMNS].astype(
+        {
+            "last_observed_TWS": "float32",
+            "h": "int8",
+            "lat": "float32",
+            "lon": "float32",
+            "month_sin": "float32",
+            "month_cos": "float32",
+            "SPEI_01_t": "float32",
+            "SPEI_03_t": "float32",
+            "SPEI_06_t": "float32",
+            "SPEI_12_t": "float32",
+            "SOIL_MOISTURE_t": "float32",
+        }
+    )
+    if not np.isfinite(out.to_numpy(dtype=np.float32)).all():
+        raise AssertionError("Hydro feature matrix contains non-finite values")
     return out.reset_index(drop=True)
 
 

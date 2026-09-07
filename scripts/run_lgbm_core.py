@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -17,8 +17,11 @@ from src.baselines import predict_persistence
 from src.metrics import score_by_horizon
 from src.ml_features import (
     CORE_FEATURE_COLUMNS,
+    HYDRO_FEATURE_COLUMNS,
     SOURCE_CORE_COLUMNS,
+    SOURCE_HYDRO_COLUMNS,
     build_core_feature_matrix,
+    build_hydro_feature_matrix,
     build_sampled_training_rows,
     horizon_rebalance_weights,
     validation_horizon_weights,
@@ -80,6 +83,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20260907)
     parser.add_argument("--num-boost-round", type=int, default=1600)
     parser.add_argument("--early-stopping-rounds", type=int, default=100)
+    parser.add_argument(
+        "--feature-set",
+        choices=["core", "hydro"],
+        default="core",
+        help="core=EXP001; hydro=EXP002 fresh SPEI+soil ablation",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -87,7 +96,7 @@ def main() -> None:
     unknown = [name for name in args.folds if name not in allowed_names]
     if unknown:
         raise ValueError(
-            f"EXP001 intentionally supports dev1-dev3 only; lockbox is protected. Unknown: {unknown}"
+            f"Development experiments intentionally support dev1-dev3 only; lockbox is protected. Unknown: {unknown}"
         )
 
     train_path = args.data_dir / "Train.csv"
@@ -97,11 +106,26 @@ def main() -> None:
     print("[1/5] Reading target-blind state/features and isolated labels...")
     usecols = [
         "sample_id", "time", "lat", "lon", "TWS_t",
-        "month_sin", "month_cos", "target",
+        "month_sin", "month_cos",
+        "SPEI_01_t", "SPEI_03_t", "SPEI_06_t", "SPEI_12_t",
+        "SOIL_MOISTURE_t", "target",
     ]
     raw = pd.read_csv(train_path, usecols=usecols)
     structural = raw.loc[:, ["sample_id", "time", "lat", "lon", "TWS_t"]].copy()
-    source_features = raw.loc[:, SOURCE_CORE_COLUMNS].copy()
+    if args.feature_set == "core":
+        feature_columns = CORE_FEATURE_COLUMNS
+        source_columns = SOURCE_CORE_COLUMNS
+        feature_builder = build_core_feature_matrix
+        experiment_name = "EXP001"
+        model_name = "exp001_core_delta_lgbm"
+    else:
+        feature_columns = HYDRO_FEATURE_COLUMNS
+        source_columns = SOURCE_HYDRO_COLUMNS
+        feature_builder = build_hydro_feature_matrix
+        experiment_name = "EXP002"
+        model_name = "exp002_fresh_hydro_delta_lgbm"
+
+    source_features = raw.loc[:, source_columns].copy()
     labels = raw.loc[:, ["sample_id", "target"]].copy()
     del raw
 
@@ -115,7 +139,7 @@ def main() -> None:
     params["data_random_seed"] = args.seed
 
     all_results = []
-    print("[3/5] Building EXP001 sampled-h training sets and direct-h validation sets...")
+    print(f"[3/5] Building {experiment_name} sampled-h training sets and direct-h validation sets...")
 
     for fold_name in args.folds:
         started = time.perf_counter()
@@ -127,16 +151,16 @@ def main() -> None:
 
         sampled = build_sampled_training_rows(
             structural,
-            source_features,
+            source_features.loc[:, SOURCE_CORE_COLUMNS],
             max_target_month=fold.max_training_target_month,
             seed=args.seed,
         )
         train_rows = sampled.rows
-        X_train = build_core_feature_matrix(train_rows, source_features)
+        X_train = feature_builder(train_rows, source_features)
         y_train_delta, _ = _attach_labels(train_rows, labels)
         train_weight = horizon_rebalance_weights(train_rows["h"])
 
-        X_valid = build_core_feature_matrix(fold.ledger, source_features)
+        X_valid = feature_builder(fold.ledger, source_features)
         y_valid = _validation_labels(fold)
         y_valid_delta = y_valid - fold.ledger["last_observed_TWS"].to_numpy(dtype=np.float32)
         valid_weight = validation_horizon_weights(fold.ledger["h"])
@@ -153,7 +177,7 @@ def main() -> None:
             "validation_rows": int(len(fold.ledger)),
             "dropped_training_missing_anchor": int(sampled.dropped_missing_anchor),
             "training_h_counts": sampled.horizon_counts,
-            "feature_columns": CORE_FEATURE_COLUMNS,
+            "feature_columns": feature_columns,
             "persistence_weighted_rmse": float(persistence_score),
         }
         print(f"\n=== {fold_name.upper()} PREP ===")
@@ -177,14 +201,14 @@ def main() -> None:
             X_train,
             label=y_train_delta,
             weight=train_weight,
-            feature_name=CORE_FEATURE_COLUMNS,
+            feature_name=feature_columns,
             free_raw_data=True,
         )
         valid_set = lgb.Dataset(
             X_valid,
             label=y_valid_delta,
             weight=valid_weight,
-            feature_name=CORE_FEATURE_COLUMNS,
+            feature_name=feature_columns,
             reference=train_set,
             free_raw_data=True,
         )
@@ -208,7 +232,7 @@ def main() -> None:
 
         importance = pd.DataFrame(
             {
-                "feature": CORE_FEATURE_COLUMNS,
+                "feature": feature_columns,
                 "gain": model.feature_importance(importance_type="gain"),
                 "split": model.feature_importance(importance_type="split"),
             }
@@ -216,7 +240,7 @@ def main() -> None:
 
         result = {
             **prep_report,
-            "model": "exp001_core_delta_lgbm",
+            "model": model_name,
             "weighted_rmse": float(score),
             "absolute_gain_vs_persistence": float(improvement),
             "pct_gain_vs_persistence": float(improvement_pct),
@@ -247,7 +271,7 @@ def main() -> None:
         print("Feature importance (gain):")
         print(importance.to_string(index=False))
 
-    print("[5/5] EXP001 summary...")
+    print(f"[5/5] {experiment_name} summary...")
     print("\nJSON_RESULTS")
     print(json.dumps(all_results, indent=2))
 
@@ -255,12 +279,12 @@ def main() -> None:
         scores = [r["weighted_rmse"] for r in all_results]
         gains = [r["absolute_gain_vs_persistence"] for r in all_results]
         print(
-            f"\nEXP001 MEAN weighted_RMSE={np.mean(scores):.6f}  "
+            f"\n{experiment_name} MEAN weighted_RMSE={np.mean(scores):.6f}  "
             f"mean_abs_gain_vs_persistence={np.mean(gains):+.6f}"
         )
-        print("EXP001 COMPLETE: pooled target-blind delta LightGBM scored on dev folds only.")
+        print(f"{experiment_name} COMPLETE: pooled target-blind delta LightGBM scored on dev folds only.")
     else:
-        print("\nEXP001 DRY RUN PASSED: target-blind feature construction is ready for Kaggle training.")
+        print(f"\n{experiment_name} DRY RUN PASSED: target-blind feature construction is ready for Kaggle training.")
 
 
 if __name__ == "__main__":

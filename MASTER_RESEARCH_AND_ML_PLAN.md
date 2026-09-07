@@ -2489,6 +2489,68 @@ persistence reference: 0.628228
 
 EXP001 intentionally does **not** use current SPEI or soil moisture yet. Its purpose is to isolate the value of the pooled ΔTWS formulation, h-conditioning, geography and seasonality before adding fresh hydrometeorological information in the next controlled ablation.
 
+## 2026-09-07 — EXP001 promoted across all three development folds
+
+Kaggle reproduced a strong and highly consistent improvement from the frozen EXP001 recipe on dev1–dev3. No parameter or feature changes were made between folds, and the protected lockbox remained untouched.
+
+| Fold | Persistence | EXP001 | Absolute gain | Relative gain |
+|---|---:|---:|---:|---:|
+| dev1 | 0.628228 | **0.569746** | +0.058482 | +9.31% |
+| dev2 | 0.696437 | **0.637836** | +0.058601 | +8.41% |
+| dev3 | 0.684559 | **0.621771** | +0.062787 | +9.17% |
+
+Mean EXP001 weighted RMSE across the three dev folds is approximately **0.609784** versus persistence mean **0.669741**, an average absolute gain of roughly **0.0600 RMSE**.
+
+The horizon pattern is especially important. EXP001 beats persistence at **every h on every fold**, and the absolute improvement generally increases as the TWS state becomes staler. Examples:
+
+- dev1: h1 +0.0311, h4 +0.0735, h7 +0.1049;
+- dev2: h1 +0.0222, h4 +0.0787, h7 +0.1222;
+- dev3: h1 +0.0292, h4 +0.0729, h7 +0.1142.
+
+This strongly validates the central formulation:
+
+> **pooled global direct residual / ΔTWS forecasting, explicitly conditioned on legal TWS age h, is materially better than persistence and becomes more valuable as the stale-state horizon grows.**
+
+Feature importance is also stable across folds: `last_observed_TWS` dominates, followed by latitude/longitude, then `h`, then seasonal sin/cos. This supports keeping geography and explicit horizon age in the core model.
+
+Decision: **PROMOTE EXP001 as the core incumbent. Do not tune tree hyperparameters yet. First test whether fresh supplied hydrometeorological variables add orthogonal signal.**
+
+## EXP002 — Fresh supplied hydrometeorology ablation
+
+EXP002 changes exactly one thing relative to EXP001: it adds the legally available **current source-month** supplied covariates:
+
+```text
+SPEI_01_t
+SPEI_03_t
+SPEI_06_t
+SPEI_12_t
+SOIL_MOISTURE_t
+```
+
+The complete EXP002 feature set is therefore:
+
+```text
+last_observed_TWS
+h
+lat
+lon
+month_sin
+month_cos
+SPEI_01_t
+SPEI_03_t
+SPEI_06_t
+SPEI_12_t
+SOIL_MOISTURE_t
+```
+
+All other choices remain frozen: same ΔTWS target, same deterministic sampled-h training construction, same horizon reweighting, same LightGBM parameters, same dev folds, and same lockbox protection.
+
+Critical causal rule:
+
+> TWS-derived state is restricted to the exact legal historical anchor `target_month - h`, while SPEI/soil/calendar features remain fresh at the current source month. The feature builder never receives `target`.
+
+Local EXP002 dev1 dry run passed with the same 975,657 training rows and 1,958,165 validation rows as EXP001, confirming this is a clean feature-only ablation.
+
 ---
 
 # 33. 2026-09-07 — EXP001 dev1 result: pooled ΔTWS LightGBM promoted
