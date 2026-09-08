@@ -363,7 +363,7 @@ def main() -> None:
             recipes = [
                 ("C0_frozen173", x0_train, x0_valid, {"num_leaves": 63, "min_data_in_leaf": 1000}, 173),
                 ("C0_capacity_selected", x0_train, x0_valid, selections["C0_safe"], selections["C0_safe"]["selected_rounds"]),
-                ("C1_regional_capacity_selected", x1_train, x1_valid, selections["C1_regional_5plus15"], selections["C1_regional_5plus15"]["selected_rounds"]),
+                ("C1_regional_matched_capacity", x1_train, x1_valid, selections["C0_safe"], selections["C0_safe"]["selected_rounds"]),
             ]
             for name, xt, xv, cfg, rounds in recipes:
                 params = dict(params_base, num_leaves=int(cfg["num_leaves"]), min_data_in_leaf=int(cfg["min_data_in_leaf"]))
@@ -396,13 +396,13 @@ def main() -> None:
         for origin in OUTER_ORIGINS:
             frozen = by[(origin, "C0_frozen173")]
             c0 = by[(origin, "C0_capacity_selected")]
-            c1 = by[(origin, "C1_regional_capacity_selected")]
+            c1 = by[(origin, "C1_regional_matched_capacity")]
             effect_rows.append({
                 "origin": origin,
                 "capacity_gain_raw_rmse": float(frozen["raw_rmse"] - c0["raw_rmse"]),
                 "regional_gain_at_matched_selected_capacity_raw_rmse": float(c0["raw_rmse"] - c1["raw_rmse"]),
                 "frozen173_raw_rmse": frozen["raw_rmse"], "c0_selected_raw_rmse": c0["raw_rmse"],
-                "c1_selected_raw_rmse": c1["raw_rmse"],
+                "c1_matched_capacity_raw_rmse": c1["raw_rmse"],
             })
         _json(args.output_dir / "metrics.json", {"results": outer_results, "effects": effect_rows,
                                                   "selections": selections, "structure": prefit})
