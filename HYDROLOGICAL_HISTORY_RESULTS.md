@@ -3,7 +3,9 @@
 **Status:** Stage A and all fixed-capacity Stage B outer/inner ablations are
 completed. B3/98 is the frozen Stage B selection by mean inner weighted RMSE;
 the margin over B2 is too small to treat as a practical deployment promotion.
-**Latest trajectory-code SHA:** `545fe9963fe6388eb89e065b9f39afcc233ba081`
+**Stage B runner provenance:** outer B1/B2/B3 runs used
+`545fe9963fe6388eb89e065b9f39afcc233ba081`; the inner-fold extension and
+selection runs used `c5591b428ea24bc960ddb172079de70fda957d16`.
 **Execution pin:** pass the checked-out, pushed full `git rev-parse HEAD` value
 to each runner's `--expected-commit`; the runner records it in its manifest.
 **Environment:** the repaired Kaggle checkout and experiment root are writable
@@ -139,8 +141,9 @@ The B2 package is
 (22,101,247 bytes, SHA-256
 `95b8c2e1230d7a46d0a80e1ab6a428fbfa2b0ce9eec1fd85e6acc09faf62715e`),
 completed in 986.61 s with a 20.521 GiB peak RSS. At this checkpoint those two
-full packages are remotely durable; local transfer is recorded separately only
-after an exact checksum match.
+full packages are remotely durable. The checksum-matched local ignored B1/B2
+archives are `artifacts/hydro_trajectory_b1_local_20260908T064928Z.zip` and
+`artifacts/hydro_trajectory_b2_regional_20260908T070438Z.zip`, respectively.
 
 ## Stage B3 — combined-block ablation
 
