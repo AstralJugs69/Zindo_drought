@@ -53,20 +53,23 @@ def _prepare(run_dirs: tuple[Path, ...]) -> pd.DataFrame:
         raise FileNotFoundError(f"no neural OOF files under {run_dirs}")
     neural = pd.concat((pd.read_csv(path) for path in neural_paths), ignore_index=True)
     metadata = ["sample_id", "target", "h", "origin", "anchor_age_months", "calendar_block", "geo5"]
-    if neural.groupby("sample_id").size().nunique() != 1:
+    # Replays can contain the same physical sample ID at more than one origin;
+    # origin is therefore part of the exact paired-OFF identity.
+    identity = ["origin", "sample_id"]
+    if neural.groupby(identity).size().nunique() != 1:
         raise AssertionError("neural seeds do not have complete, equal OOF coverage")
-    averaged = neural.groupby("sample_id", as_index=False).agg(
-        **{key: (key, "first") for key in metadata if key != "sample_id"},
+    averaged = neural.groupby(identity, as_index=False).agg(
+        **{key: (key, "first") for key in metadata if key not in identity},
         prediction_neural=("prediction", "mean"),
         neural_seed_count=("seed", "nunique"),
     )
     if not (averaged.neural_seed_count == 2).all():
         raise AssertionError("outer neural OOF does not contain exactly two predeclared seeds per ID")
     b3 = baseline.loc[:, metadata + ["prediction"]].rename(columns={"prediction": "prediction_B3"})
-    joined = b3.merge(averaged, on="sample_id", how="inner", suffixes=("_B3_meta", "_neural_meta"), validate="one_to_one")
+    joined = b3.merge(averaged, on=identity, how="inner", suffixes=("_B3_meta", "_neural_meta"), validate="one_to_one")
     if len(joined) != len(b3) or len(joined) != len(averaged):
         raise AssertionError("B3 and neural OOF ID coverage differs")
-    for key in metadata[1:]:
+    for key in (key for key in metadata if key not in identity):
         left, right = f"{key}_B3_meta", f"{key}_neural_meta"
         if left in joined and right in joined:
             if not joined[left].equals(joined[right]):

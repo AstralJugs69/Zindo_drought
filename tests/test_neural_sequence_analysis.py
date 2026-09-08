@@ -49,3 +49,23 @@ def test_analysis_recovers_valid_per_fit_oof_after_runner_dies_before_concat(tmp
     result = analyze(run, tmp_path / "recovered", repeats=5)
 
     assert np.isclose(result["overall"]["neural_raw_rmse"], .2)
+
+
+def test_analysis_keys_pairs_by_origin_and_sample_id(tmp_path: Path):
+    run = tmp_path / "overlap"
+    (run / "baseline").mkdir(parents=True)
+    for origin in ("2007-09", "2009-01"):
+        base = pd.DataFrame([{
+            "sample_id": f"shared-{horizon}", "target": float(horizon), "h": horizon,
+            "origin": origin, "anchor_age_months": 0, "calendar_block": origin, "geo5": "g0",
+            "prediction": float(horizon) + .2,
+        } for horizon in range(1, 8)])
+        base.to_csv(run / "baseline" / f"{origin}_B3_oof.csv.gz", index=False, compression="gzip")
+        for seed, offset in ((20260908, .1), (20260909, .3)):
+            per_fit = run / "neural" / f"{origin}_gru_s12_seed{seed}"
+            per_fit.mkdir(parents=True)
+            base.assign(prediction=base.target + offset, seed=seed).to_csv(per_fit / "best_epoch_oof.csv.gz", index=False, compression="gzip")
+
+    result = analyze(run, tmp_path / "overlap-analysis", repeats=5)
+
+    assert result["rows"] == 14
