@@ -1,7 +1,7 @@
 # Hydrological history results
 
-**Status:** Stage A availability audit completed; no Stage B model fit has been
-run.
+**Status:** Stage A availability audit and the Stage B0 reference pilot are
+completed; no added-history B1/B2/B3 model fit has run.
 **Latest trajectory-code SHA:** `1810664d9145c07e2ebc7497555a5da63522a3a2`
 **Execution pin:** pass the checked-out, pushed full `git rev-parse HEAD` value
 to each runner's `--expected-commit`; the runner records it in its manifest.
