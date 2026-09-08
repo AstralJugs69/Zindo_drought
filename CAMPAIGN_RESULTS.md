@@ -63,6 +63,11 @@ remained in `Draft Session Starting` with execution controls disabled. This is a
 separate infrastructure-state blocker; no claim is made about B2 predictive
 performance.
 
+A later safe restart reached `Draft Session Waiting for previous session to
+ upload results` and remained there across repeated checks. The notebook is not
+ being force-stopped or replaced; the next action is to retry only after Kaggle
+ reports a runnable kernel.
+
 ## Executed evidence
 
 See `NEXT_ACTION.md` for the corrected spatial gate, the paired regional smoke
