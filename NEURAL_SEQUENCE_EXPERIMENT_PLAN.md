@@ -63,6 +63,13 @@ norm clip 5, dropout 0.10, and a maximum of 30 epochs on CUDA when available.
 The random model seeds are `20260908` and `20260909`; deterministic data order is
 fixed separately.  There is no hyperparameter search.
 
+On Kaggle SSH launches, use `scripts/run_kaggle_neural_sequence.sh` rather than
+calling the Python runner directly. The wrapper exports `/opt/bin` and the
+NVIDIA/CUDA library paths before Python starts, because Kaggle recreates the
+custom `kaggle` SSH user after a full kernel restart and does not preserve those
+interactive-shell exports. The runner records the actual selected device for
+each fit; it must never claim CUDA merely because the wrapper was invoked.
+
 - **MLP control:** B3 static branch `446 -> 192 -> 96 -> 1` (the input width is
   inferred and recorded, not assumed).
 - **GRU:** one 64-unit causal GRU over the shared channels; B3 static branch
