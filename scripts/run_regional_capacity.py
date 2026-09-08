@@ -119,24 +119,27 @@ def _choose_inner_replays(train: pd.DataFrame, template: pd.DataFrame) -> list[S
     eligible = [s for s in starts if s + max_offset + 1 < earliest_outer]
     if len(eligible) < 2:
         raise AssertionError(f"need two inner replay starts before {earliest_outer}, found {len(eligible)}")
-    # Freeze the two latest non-overlapping target calendars using only the
-    # transplanted source-date geometry, before constructing any scored fold.
-    chosen: list[pd.Period] = []
-    used_targets: set[pd.Period] = set()
-    for start in reversed(eligible):
-        targets = {start + off + 1 for off in offsets}
-        if targets.isdisjoint(used_targets):
-            chosen.append(start); used_targets.update(targets)
-        if len(chosen) == 2:
-            break
-    if len(chosen) != 2:
-        raise AssertionError("could not freeze two non-overlapping inner replay calendars")
-    chosen.reverse()
+    # The 40-month transplanted Test geometry makes two fully disjoint inner
+    # target calendars impossible before the earliest outer origin. Freeze the
+    # deterministic pair with minimum target-month overlap instead. Ties favor
+    # wider temporal separation, then the latest second replay. This uses only
+    # calendar structure; no labels or scores participate in the choice.
+    pairs: list[tuple[int, int, pd.Period, pd.Period]] = []
+    for i, a in enumerate(eligible):
+        ta = {a + off + 1 for off in offsets}
+        for b in eligible[i + 1:]:
+            tb = {b + off + 1 for off in offsets}
+            overlap = len(ta.intersection(tb))
+            separation = int(b.ordinal - a.ordinal)
+            pairs.append((overlap, -separation, a, b))
+    if not pairs:
+        raise AssertionError("could not freeze two inner replay calendars")
+    _, _, first, second = min(pairs, key=lambda x: (x[0], x[1], -x[3].ordinal))
+    chosen = [first, second]
     return [build_template_replay_fold(
         train, template, start_month=start,
         scenario_id=f"capacity_inner_{start}", family="inner_capacity_selection",
     ) for start in chosen]
-
 
 def _reserved_transfer_block(train: pd.DataFrame, excluded_targets: set[pd.Period]) -> dict[str, object] | None:
     periods = sorted(pd.to_datetime(train["time"]).dt.to_period("M").unique())
