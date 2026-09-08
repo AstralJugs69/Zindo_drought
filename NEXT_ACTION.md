@@ -1,48 +1,26 @@
-# Next action — Stage B hydrological-history reference
+# Next action — select the Stage B hydrological-history candidate
 
-## 2026-09-08 — Stage A completed; start B0 reference only
+## 2026-09-08 — B0/B1/B2/B3 outer ablations completed
 
-- The repaired Kaggle checkout is writable and is clean at
-  `1810664d9145c07e2ebc7497555a5da63522a3a2` while this checkpoint is written.
-  Do not reset it: the preceding three Kaggle-only commits are intentional.
-- Stage A run `history_availability_audit_20260908T055537Z` completed in
-  209.57 s. All 56 B0 features are available in Test, and no Test horizon,
-  season, or five-degree cell is outside historical support. Broad and matched
-  spatial domain AUCs are 0.936608 and 0.900016. Treat the latter as a
-  temporal-shift warning, not as a reason to discard the causal B0 protocol.
-- The compact remote bundle is
-  `/kaggle/working/drought_runs/history_availability_audit_20260908T055537Z/audit_artifacts.zip`
-  (SHA-256 `7f20174f4894a45c8ee1afd856f43efd6b6b08a24616a1c66e3c25a8d65d2788`);
-  its checksum-matched local Git-ignored copy is
-  `artifacts/history_availability_audit_20260908T055537Z.zip`.
-- B0 pilot `hydro_trajectory_b0_pilot_20260908T060339Z` then completed from
-  `d21ccba667840d88c20b7c0dc037f835996bb437`: 56-feature `B0=C1/98` scored
-  raw/weighted RMSE 0.523809/0.523795 at 2007-09 (851,814 / 278,447 training /
-  validation rows). Its 8,126,728-byte remote archive and local ignored copy
-  both hash to `c23a3d8229825bc0d50ead0c8c6b3558b3cfb6c60b16d04ab5907a91c6f62c4a`.
-  Test schema parity passed; no Test prediction was produced. Map construction
-  succeeded, but its phase-only memory snapshots motivated the now-tested
-  continuous peak-memory tracker.
-- **Next single run:** fixed 98-round B0 at the three remaining declared
-  origins, then inspect all B0 metrics before running any B1/B2/B3 candidate.
-  It produces OOF diagnostics, feature-schema parity checks, and model artifacts
-  only—never Test predictions or a submission.
-
-  ```bash
-  cd /kaggle/working/Zindo_drought
-  git status --short --branch
-  expected_commit=$(git rev-parse HEAD)
-
-  python -u scripts/run_hydrological_trajectory.py \
-    --data-dir /kaggle/input/datasets/cashgenenator/drought \
-    --output-dir /kaggle/working/drought_runs/hydro_trajectory_b0_remaining_<UTC> \
-    --expected-commit "$expected_commit" \
-    --origins 2009-01 2014-04 2014-12 --candidates B0 --rounds 98
-  ```
-
-- Inspect source-map construction, elapsed time, continuous peak memory, Test
-  feature contract, OOF/model count, manifest and log before evaluating
-  B1/B2/B3. Do not reinterpret the inherited C1/59 metrics as C1/98 metrics.
+- The completed Stage B runs used clean, pinned source
+  `545fe9963fe6388eb89e065b9f39afcc233ba081` on `codex/validation-rebuild`.
+  Do not reset the branch: the earlier Kaggle-only commits are intentional.
+- The four B0 references and B1/B2 trajectory ablations completed on Kaggle
+  without Test predictions. B1 and B2 improved raw RMSE in the favorable
+  direction on every declared development/stress replay. The full metrics, run
+  paths, checksums, memory, and statistical limits are in
+  `HYDROLOGICAL_HISTORY_RESULTS.md`.
+- B3's full outer ablation completed. It improved B0 on every replay, although
+  B1 is the best single variant at 2009-01 and B2 at 2014-04. The remaining B3
+  package is 13,993,051 bytes with SHA-256
+  `3ba286a2e60221e906e26ea58772e716cf8a786e768397a83d8d71a277f36318`; it
+  recorded `no_test_predictions=true`, a finite-or-missing 446-column Test
+  contract, and no Test prediction.
+- **Next single candidate-selection job:** run fixed 98-round B0/B1/B2/B3 on
+  the predeclared 2003-04 and 2004-04 template inner replays from a clean,
+  pinned checkout. Select only after inspecting both inner metrics, then freeze
+  that candidate/capacity before any Stage C control. Do not generate Test
+  predictions or a competition submission.
 
 # Next action — local-response stress result
 

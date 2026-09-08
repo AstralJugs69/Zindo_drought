@@ -9,7 +9,7 @@ from src.hydro_trajectory import (
     build_regional_trajectory_map,
 )
 from src.regional_context import HYDRO_COLUMNS, build_regional_context
-from scripts.run_hydrological_trajectory import MemoryTracker
+from scripts.run_hydrological_trajectory import ALL_ORIGINS, INNER_ORIGINS, MemoryTracker, OUTER_ORIGINS
 
 
 def _source() -> pd.DataFrame:
@@ -87,3 +87,9 @@ def test_memory_tracker_exposes_current_and_peak_or_a_clear_unavailable_note():
         assert snapshot["rss_gib"] >= 0.0
         assert snapshot["peak_rss_gib"] >= snapshot["rss_gib"]
         assert snapshot["min_available_gib"] >= 0.0
+
+
+def test_inner_origins_are_explicit_and_do_not_change_outer_defaults():
+    assert INNER_ORIGINS == ("2003-04", "2004-04")
+    assert ALL_ORIGINS == (*INNER_ORIGINS, *OUTER_ORIGINS)
+    assert OUTER_ORIGINS == ("2007-09", "2009-01", "2014-04", "2014-12")

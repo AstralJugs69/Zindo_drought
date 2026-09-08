@@ -42,6 +42,8 @@ from src.validation import build_test_mask_template
 SEED = 20260908
 ROUNDS = 98
 OUTER_ORIGINS = ("2007-09", "2009-01", "2014-04", "2014-12")
+INNER_ORIGINS = ("2003-04", "2004-04")
+ALL_ORIGINS = (*INNER_ORIGINS, *OUTER_ORIGINS)
 CANDIDATES = ("B0", "B1_local", "B2_regional", "B3_both")
 
 
@@ -132,6 +134,11 @@ class MemoryTracker:
 
 
 def _fold(train: pd.DataFrame, template: pd.DataFrame, origin: str) -> tuple[SimulatedFold, str]:
+    if origin in INNER_ORIGINS:
+        return build_template_replay_fold(
+            train, template, start_month=origin,
+            scenario_id=f"trajectory_inner_{origin}", family="inner_capacity_selection",
+        ), "inner_capacity_selection"
     if origin == "2014-04":
         return build_mask_block_fold(
             train, anchor_month=origin, end_month="2014-10",
@@ -195,7 +202,7 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)
-    parser.add_argument("--origins", nargs="+", choices=OUTER_ORIGINS, default=list(OUTER_ORIGINS))
+    parser.add_argument("--origins", nargs="+", choices=ALL_ORIGINS, default=list(OUTER_ORIGINS))
     parser.add_argument("--candidates", nargs="+", choices=CANDIDATES, default=list(CANDIDATES))
     parser.add_argument("--rounds", type=int, default=ROUNDS)
     args = parser.parse_args()

@@ -9,7 +9,7 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
-## 2026-09-08 — hydrological history Stage A checkpoint
+## 2026-09-08 — hydrological history Stage B checkpoint
 
 The completed regional artifact establishes that combined contemporaneous 5-degree
 and 15-degree hydrological context helps at the C0-matched 59-round capacity on
@@ -17,7 +17,7 @@ four development/stress replays. It does **not** contain an outer C1/98 result:
 98 rounds were selected only from the two overlapping inner replays. This
 distinction is now enforced in `HYDROLOGICAL_HISTORY_RESULTS.md`.
 
-Commit `1810664d9145c07e2ebc7497555a5da63522a3a2` contains the predeclared,
+Commit `545fe9963fe6388eb89e065b9f39afcc233ba081` contains the predeclared,
 availability-safe Stage A audit and B0/B1/B2/B3 causal trajectory ablation. The
 new local and regional summaries use only source covariates through the event's
 actual calendar month, retain missing support, and exclude TWS/target values.
@@ -26,18 +26,33 @@ without Test predictions. It found all 56 B0 features available in Test, with
 the same 893 five-degree cells and no unseen horizon/season/geo strata. Broad
 and h/season/geo-matched spatial domain AUCs were 0.936608 and 0.900016,
 respectively. This is a meaningful disjoint-calendar distribution-shift warning,
-not a feature promotion or a schema defect. The next bounded action is the
-fixed 98-round B0 outer reference before assessing any trajectory candidate.
+not a feature promotion or a schema defect.
 
-That B0 pilot then completed at 2007-09 from commit
+The B0 pilot completed at 2007-09 from commit
 `d21ccba667840d88c20b7c0dc037f835996bb437`: the 56-feature current-regional
 `B0=C1/98` information set scored raw/weighted RMSE **0.523809/0.523795** on
 278,447 rows after training on 851,814 causal rows. It constructed and verified
 the 56-column Test schema without generating Test predictions. Its 549.23-second
 runtime was dominated by target-blind trajectory-map construction; fit time was
-32.80 seconds. The runner now records continuous peak RSS and minimum available
-memory for the remaining declared replays. This single development pilot neither
-promotes a recipe nor establishes a capacity effect versus the older C1/59 run.
+32.80 seconds. It neither promotes a recipe nor establishes a capacity effect
+versus the older C1/59 run.
+
+The remaining B0 references and the B1-local/B2-regional 98-round ablations
+then completed on the four declared development/stress replays without Test
+predictions. B1 raw-RMSE gains versus B0 were +0.005994, +0.004481, +0.005512,
+and +0.002382; B2 gains were +0.005151, +0.003866, +0.008623, and +0.002250
+(2007-09, 2009-01, 2014-04, 2014-12 respectively). These consistent
+development directions meet the screen's outer guardrail and justify the next
+frozen 2003-04/2004-04 inner selection step; they do not yet make Stage C
+eligible or constitute independent confirmation.
+
+The 446-feature B3 combined model completed all four outer replays without Test
+predictions. Raw-RMSE gains versus B0 were +0.006449, +0.003396, +0.007332,
+and +0.002610; B3 was best at 2007-09 and 2014-12, while B1 was best at 2009-01
+and B2 at 2014-04. The full B3 job reached 26.643 GiB peak RSS but completed
+cleanly. The next fixed decision step is the frozen 2003-04/2004-04 inner
+selection, not a post-hoc outer-replay choice. `HYDROLOGICAL_HISTORY_RESULTS.md`
+is the authoritative per-run artifact/checksum ledger.
 
 ## 2026-09-08 — bounded local-response experiment (Kaggle-only)
 
