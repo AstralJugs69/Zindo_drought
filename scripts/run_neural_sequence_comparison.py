@@ -130,6 +130,16 @@ def _rmse(oof: pd.DataFrame) -> tuple[float, dict[str, float]]:
     return float(np.sqrt(np.mean(np.square(oof.residual.to_numpy(dtype=np.float64))))), out
 
 
+def _chosen_epoch(rows: list[dict[str, object]], frozen_epoch: int | None) -> dict[str, object]:
+    """Select an inner best epoch, or use a previously frozen epoch exactly."""
+    if frozen_epoch is None:
+        return min(rows, key=lambda row: (float(row["valid_raw_rmse"]), int(row["epoch"])))
+    matches = [row for row in rows if int(row["epoch"]) == frozen_epoch]
+    if len(matches) != 1:
+        raise ValueError(f"frozen epoch {frozen_epoch} is absent from trained curve")
+    return matches[0]
+
+
 def _torch_setup(seed: int):
     import torch
     torch.manual_seed(seed)
@@ -190,6 +200,7 @@ def _fit_neural(
     sequence_valid: np.ndarray | None, y_train: np.ndarray, y_valid: np.ndarray,
     weight_train: np.ndarray, ledger: pd.DataFrame, labels: pd.DataFrame,
     static_columns: list[str], sequence_columns: tuple[str, ...] | None, epochs: int = MAX_EPOCHS,
+    frozen_epoch: int | None = None,
 ) -> tuple[list[dict[str, object]], pd.DataFrame]:
     torch, device = _torch_setup(seed)
     run_name = f"{origin}_{architecture}_s{span or 0}_seed{seed}"
@@ -243,7 +254,7 @@ def _fit_neural(
         checkpoint_by_epoch[epoch] = checkpoint
     curve = pd.DataFrame([{**row, "by_h": json.dumps(row["by_h"], sort_keys=True)} for row in epoch_rows])
     curve.to_csv(run_dir / "curve.csv", index=False)
-    best_epoch = min(epoch_rows, key=lambda r: (float(r["valid_raw_rmse"]), int(r["epoch"])))
+    best_epoch = _chosen_epoch(epoch_rows, frozen_epoch)
     checkpoint_path = checkpoint_by_epoch[int(best_epoch["epoch"])]
     checkpoint_state = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint_state["state_dict"])
@@ -388,7 +399,8 @@ def main() -> None:
                     curves, best = _fit_neural(output=args.output_dir, architecture=architecture, origin=origin, seed=seed, span=span,
                                                 static_train=static_train, static_valid=static_valid, sequence_train=seq_train, sequence_valid=seq_valid,
                                                 y_train=cap_y, y_valid=valid_target, weight_train=cap_w, ledger=fold.ledger, labels=labels,
-                                                static_columns=valid_b3.columns.tolist(), sequence_columns=sequence_columns, epochs=args.epochs if args.phase == "inner" else int(selection["epoch"]))
+                                                static_columns=valid_b3.columns.tolist(), sequence_columns=sequence_columns, epochs=args.epochs if args.phase == "inner" else int(selection["epoch"]),
+                                                frozen_epoch=None if args.phase == "inner" else int(selection["epoch"]))
                     epoch_rows.extend(curves); all_best_oof.append(best); _emit(log, {"phase": "neural_complete", "origin": origin, "architecture": architecture, "span": span, "seed": seed, "best": min(curves, key=lambda x: x["valid_raw_rmse"]), "memory": _memory()})
                 del cached_sequences, static_train, static_valid, valid_b3, maps
         if baseline_results:
