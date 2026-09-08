@@ -8,8 +8,8 @@ added only after fresh Kaggle evidence is inspected.
 | Branch | State | Evidence / limitation |
 |---|---|---|
 | Corrected Phase A accounting | measured | Kaggle run `spatial_phase_a_repaired_20260908T013000Z`; commit `0f406fa...`; corrected values and retraction in `NEXT_ACTION.md` |
-| Spatial B1 ranks 8/16 | pending | Requires causal forecast implementation and Kaggle run |
-| Spatial B2 ranks 8/16 | pending | Requires causal temporal-factor implementation and Kaggle run |
+| Spatial B1 ranks 8/16 | measured-negative | Kaggle run completed; all origins regressed; per-rank OOF persisted |
+| Spatial B2 ranks 8/16 | failed-runtime | First run reset Kaggle session; retry is currently blocked at session startup |
 | Regional 5/15-degree paired features | measured-partial | Both widths completed at frozen-173 with per-fit OOF/model files; inner capacity selection and transfer checks pending |
 | Inner capacity selection | pending | Chronological inner checks not yet run |
 | Additional recent/transfer block | pending | Coverage must be established before scoring |
