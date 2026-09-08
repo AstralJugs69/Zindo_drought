@@ -288,3 +288,27 @@ influenced development choices. They are not untouched confirmation evidence.
 The two inner capacity replays overlap in five target calendar months and are
 selection evidence only. Any later confirmation requires an independently
 verified unused period and a recipe frozen before one evaluation.
+
+## Stage C — availability-faithful compact neural comparison
+
+This completed comparison supersedes the earlier statement that neural sequence modelling was untested. It used the predeclared sparse replay observation view, frozen B3/98 static context, deterministic training-only 252,000-row cap, prefix-only normalization, two initial seeds, and no Test prediction or submission. Inner candidates were static MLP, causal GRU, and causal TCN; every accepted fit recorded CUDA and passed the train-only learnability check.
+
+Inner selection from `/kaggle/working/drought_runs/neural_sequence_inner_20260908T171500Z` chose the 12-slot GRU at epoch 1: mean raw RMSE **0.602960** over two origins and two seeds. This is not a B3 comparison and was frozen before outer fitting. The package is 22,576,764 bytes, SHA-256 `a8be8bb7b80cf590538f81d31aaecb790a2bc7efa5c5d367ffbf8a5314f89021`.
+
+The availability-faithful outer comparison pairs the selected GRU's two-seed mean OOF with B3 by `(origin, sample_id)`. The initial job was kernel-killed while allocating the final origin; already-written immutable OOFs were recovered and only 2014-12 was rerun after a sequential-memory repair. The repair archive is `neural_sequence_outer_20260908T190000Z_repair_2014_12.zip`, 22,576,764 bytes, SHA-256 `194983f264b50f39666dd55f13d96c43400c60d3fb955bdff3c5d6a94f969e5c`. The joined analysis is at `/kaggle/working/drought_runs/neural_sequence_outer_20260908T190000Z_analysis_recovered`.
+
+| Origin | B3 raw RMSE | GRU raw RMSE | GRU minus B3 | Equal blend minus B3 |
+|---|---:|---:|---:|---:|
+| 2007-09 | 0.528354 | 0.546294 | +0.017940 | +0.001220 |
+| 2009-01 | 0.560377 | 0.590095 | +0.029718 | +0.006879 |
+| 2014-04 | 0.582737 | 0.608675 | +0.025937 | +0.007775 |
+| 2014-12 | 0.809393 | **0.804180** | **-0.005213** | **-0.006429** |
+| all outer OOF | **0.595026** | 0.613169 | +0.018143 | +0.002334 |
+
+The overall result covers 738,956 rows and intentionally has no one-number official weighted score because it includes an h=8--12 stress tail; competition weights apply only to h=1--7. Calendar-block paired bootstrap for neural-minus-B3 raw delta is +0.009815 to +0.026459 (2.5--97.5%); 5-degree geography bootstrap is +0.015793 to +0.020731. The predeclared equal blend interval is -0.001173 to +0.006248 with an adverse point estimate. Residual correlation is 0.957139.
+
+The third seed at the frozen selected epoch had RMSE 0.612227 (2003-04) and 0.602575 (2004-04), mean 0.607401 versus initial two-seed mean 0.602960. Its archive is `neural_sequence_stability_20260908T220000Z.zip`, 36,018,558 bytes, SHA-256 `341d6e066a6b99273fabe7b17d1a50ce7e4d343aa71502500af78be47cd9cf1f`.
+
+The predeclared history ablation hid only older raw sequence slots, retaining current source channels, their masks/ages/calendar fields, and B3 static context. It tests dependence on older temporal inputs, not an information-free model. Hiding history increased mean inner raw RMSE from 0.602960 to **0.608462** (+0.005503): 2003-04 +0.001433 and 2004-04 +0.009573 across two seeds. Thus the branch used some lawful historical information, but it did not translate into a robust B3 improvement. The ablation package is `neural_sequence_ablation_20260908T223000Z.zip`, 71,949,551 bytes, SHA-256 `d0b6d9c83a7bb82a821200968c88c5724c8709e4cb99fd4c03e6be6df1d75a8b`. Remote metric-only follow-up output is `/kaggle/working/drought_runs/neural_sequence_followup_analysis_20260908T223000Z/`; its JSON SHA-256 is `71afbb70fd1b76fd05df6ae2312db0663eef9b66c47188e55f80238832ed94f4`.
+
+**Decision:** retain availability-faithful B3/98 as the strongest verified development baseline. Do not promote the compact GRU or equal B3/GRU blend; the lone 2014-12 gain is insufficient against three earlier regressions and dependence-aware uncertainty. These outer replays are development robustness evidence, not independent confirmation. No untouched confirmation, Test prediction, or submission was produced.

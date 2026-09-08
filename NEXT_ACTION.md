@@ -1,4 +1,15 @@
-# Next action — availability-faithful neural sequence comparison in progress
+# Next action — compact neural sequence comparison closed
+
+## 2026-09-08 — decision checkpoint
+
+- The availability-faithful MLP/GRU/TCN comparison is complete. Inner selection chose GRU, 12 calendar slots, epoch 1 (mean raw RMSE 0.602960 across two frozen inner origins and two seeds). A third seed averaged 0.607401; it did not alter the frozen selection or rescue the result.
+- The outer two-seed GRU is worse than B3/98 on 2007-09, 2009-01, and 2014-04; its all-outer raw delta is +0.018143. It helps only at 2014-12 (-0.005213), which is inadequate for promotion. The predeclared equal blend is also adverse overall (+0.002334). Retain **B3/98** as strongest verified development baseline; do not generate Test predictions or a submission from any neural candidate.
+- The inner history ablation confirms older lawful sequence slots carry some signal (+0.005503 RMSE when hidden), but not enough to beat B3. This is a direction decision, not a claim that history is useless.
+- The outer runner had a documented cgroup OOM on its final origin. Valid per-fit OOFs were retained and only 2014-12 was resumed after a sequential-memory repair. The paired recovered analysis, stability check, and ablation completed remotely. See `HYDROLOGICAL_HISTORY_RESULTS.md` for exact paths, hashes, and limits.
+- Source commit for the metric follow-up analyzer: `c00687d4ae9506f37090fa85d413de3d8d02ad26`; `python -m pytest -q` passed 43 tests. Remote outputs remain under `/kaggle/working/drought_runs/`; do not download them merely for inspection.
+- No neural follow-up is justified without a new independently motivated, availability-faithful hypothesis. A future confirmation must first verify a genuinely unused period and freeze its recipe before one evaluation.
+
+# Earlier checkpoint — availability-faithful neural sequence comparison
 
 ## 2026-09-08 — Stage C direct-history controls (superseded as a neural gate)
 

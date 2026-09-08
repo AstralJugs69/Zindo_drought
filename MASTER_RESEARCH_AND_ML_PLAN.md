@@ -9,6 +9,10 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
+## 2026-09-08 — compact neural sequence decision
+
+The predeclared availability-faithful MLP/GRU/TCN comparison is complete. Inner selection chose a 12-calendar-slot GRU at epoch 1 (mean two-origin, two-seed raw RMSE 0.602960), but paired outer replay OOFs show it is worse than frozen B3/98 overall: 0.613169 versus 0.595026 raw RMSE (+0.018143). The GRU regressed on 2007-09, 2009-01, and 2014-04 and helped only on 2014-12; the predeclared equal B3/GRU blend is adverse overall (+0.002334). Calendar- and geography-block bootstraps remain adverse for GRU. A third seed and lawful older-history ablation were completed: hiding older sequence slots costs +0.005503 inner RMSE, showing some history use but no transferable model advantage. Retain B3/98; do not promote the compact neural branch or create Test predictions. This is development evidence, not independent confirmation; exact artifacts and the OOM recovery are recorded in `HYDROLOGICAL_HISTORY_RESULTS.md`.
+
 ## 2026-09-08 — hydrological history Stage B checkpoint
 
 The completed regional artifact establishes that combined contemporaneous 5-degree
