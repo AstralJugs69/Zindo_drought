@@ -42,10 +42,15 @@ def _prepare(run_dirs: tuple[Path, ...]) -> pd.DataFrame:
     if not paths:
         raise FileNotFoundError(f"no B3 OOF files under {run_dirs}")
     baseline = pd.concat((pd.read_csv(path) for path in paths), ignore_index=True)
-    neural_paths = [run_dir / "neural_best_oof.csv.gz" for run_dir in run_dirs]
-    missing = [path for path in neural_paths if not path.is_file()]
-    if missing:
-        raise FileNotFoundError(f"no neural OOF file at {missing}")
+    neural_paths: list[Path] = []
+    for run_dir in run_dirs:
+        aggregate = run_dir / "neural_best_oof.csv.gz"
+        # A killed runner can leave valid per-fit OOF/checkpoint artifacts but
+        # never reach its final concatenation step.  Use those immutable OOF
+        # artifacts directly for a documented mechanical recovery.
+        neural_paths.extend([aggregate] if aggregate.is_file() else sorted((run_dir / "neural").glob("*/best_epoch_oof.csv.gz")))
+    if not neural_paths:
+        raise FileNotFoundError(f"no neural OOF files under {run_dirs}")
     neural = pd.concat((pd.read_csv(path) for path in neural_paths), ignore_index=True)
     metadata = ["sample_id", "target", "h", "origin", "anchor_age_months", "calendar_block", "geo5"]
     if neural.groupby("sample_id").size().nunique() != 1:

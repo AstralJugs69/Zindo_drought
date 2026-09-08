@@ -30,3 +30,22 @@ def test_analysis_requires_exact_two_seed_alignment_and_writes_paired_metrics(tm
     assert np.isclose(result["overall"]["B3_raw_rmse"], .2)
     assert (tmp_path / "analysis" / "neural_sequence_analysis.json").is_file()
     assert (tmp_path / "analysis" / "by_h_metrics.csv").is_file()
+
+
+def test_analysis_recovers_valid_per_fit_oof_after_runner_dies_before_concat(tmp_path: Path):
+    run = tmp_path / "interrupted"
+    (run / "baseline").mkdir(parents=True)
+    base = pd.DataFrame([{
+        "sample_id": f"sample-{horizon}", "target": float(horizon), "h": horizon,
+        "origin": "2007-09", "anchor_age_months": 0, "calendar_block": "2007-09", "geo5": "g0",
+        "prediction": float(horizon) + .2,
+    } for horizon in range(1, 8)])
+    base.to_csv(run / "baseline" / "2007-09_B3_oof.csv.gz", index=False, compression="gzip")
+    for seed, offset in ((20260908, .1), (20260909, .3)):
+        per_fit = run / "neural" / f"2007-09_gru_s12_seed{seed}"
+        per_fit.mkdir(parents=True)
+        base.assign(prediction=base.target + offset, seed=seed).to_csv(per_fit / "best_epoch_oof.csv.gz", index=False, compression="gzip")
+
+    result = analyze(run, tmp_path / "recovered", repeats=5)
+
+    assert np.isclose(result["overall"]["neural_raw_rmse"], .2)
