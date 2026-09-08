@@ -327,7 +327,7 @@ def main() -> None:
                 fold, role = _fold(train, template, origin)
                 view = build_replay_observation_view(source, structural, ledger=fold.ledger, first_source_month=fold.spec.first_source_month, last_source_month=fold.spec.last_source_month)
                 sampled = build_sampled_training_rows(view.structural, view.source.loc[:, SOURCE_CORE_COLUMNS], max_target_month=pd.Period(origin, freq="M") - 1, seed=20260908)
-                train_rows = sampled.rows; y_full = _labels(train_rows, labels); weights_full = horizon_rebalance_weights(train_rows.h).to_numpy(dtype=np.float32)
+                train_rows = sampled.rows; y_full = _labels(train_rows, labels); weights_full = np.asarray(horizon_rebalance_weights(train_rows.h), dtype=np.float32)
                 maps = build_b3_feature_maps(view.source)
                 valid_b3 = build_b3_matrix(fold.ledger, view.source, view.structural, maps)
                 _emit(log, {"phase": "features_ready", "origin": origin, "role": role, "train_rows": len(train_rows), "valid_rows": len(fold.ledger),
@@ -341,7 +341,7 @@ def main() -> None:
                         baseline_results.append(result); _emit(log, {"phase": "baseline_complete", **result})
                     del train_b0, valid_b0, train_b3
                 cap_rows = deterministic_horizon_cap(train_rows, per_horizon=PER_HORIZON_CAP)
-                cap_y = _labels(cap_rows, labels); cap_w = horizon_rebalance_weights(cap_rows.h).to_numpy(dtype=np.float32)
+                cap_y = _labels(cap_rows, labels); cap_w = np.asarray(horizon_rebalance_weights(cap_rows.h), dtype=np.float32)
                 static_train = build_b3_matrix(cap_rows, view.source, view.structural, maps).to_numpy(dtype=np.float32)
                 static_valid = valid_b3.to_numpy(dtype=np.float32)
                 valid_target = labels.set_index("sample_id").loc[fold.ledger.sample_id, "target"].to_numpy(dtype=np.float32)

@@ -208,7 +208,7 @@ bytes, SHA-256 `e48793b7950e18c8d3c6e541c8f0002c1e175eb6c70ed90ff30307a561730802
 and B3 `hydro_trajectory_inner_b3_both_20260908T114000Z.zip` (15,899,996
 bytes, SHA-256 `eddb642c4570535c397b53b55fb9588f2698422df463937605615a1b1447ddb3`).
 
-## Stage C — direct-history controls; sequence branch stopped
+## Stage C — direct-history controls only
 
 Kaggle run `hydro_sequence_controls_20260908T120000Z` completed from clean
 commit `3eacd99130cb278cdd69b7b5871b0730dbdaa6a0` in 584.15 s. It reconstructs
@@ -231,10 +231,12 @@ feature prediction, competition prediction, or submission was made.
 The tree reference exactly reproduced B3's selected inner scores and row hashes.
 Neither direct-history tree improves either frozen replay; both ridge controls
 are substantially worse. Therefore the Stage C prerequisite—an equivalent
-flattened-history control with usable signal beyond B3—is falsified. Per the
-predeclared stopping rule, **no GRU or other neural sequence model was fit**.
-This rejects the tested compact local raw-sequence formulation, not all possible
-future sequence architectures.
+flattened-history control with usable signal beyond B3—is falsified. **Neural
+sequence modelling was not tested** by this run: no GRU, TCN, or MLP was fit.
+This is a negative result for the tested compact flattened local raw-history
+formulation, not a claim about neural sequence architectures. The former no-GRU
+gate is superseded by the separately predeclared, availability-faithful neural
+comparison in `NEURAL_SEQUENCE_EXPERIMENT_PLAN.md`.
 
 The remote archive is
 `/kaggle/working/drought_runs/hydro_sequence_controls_20260908T120000Z.zip`
@@ -276,7 +278,7 @@ model-performance evidence.
 | Do regional trajectories add beyond contemporaneous C1? | Yes in these four replays: raw gain +0.002250 to +0.008623. |
 | Does C1/98 transfer to the declared outer replays? | Measured for all four: B0 raw RMSE 0.523809 / 0.559511 / 0.590070 / 0.811981. |
 | Does combined local plus regional history improve all four replays? | Yes versus B0: raw gain +0.002610 to +0.007332; it is not the best single candidate on every replay. |
-| Does a sequence model add beyond the selected B3/98 tree control? | The six-/twelve-month direct-history controls are worse on both frozen inner replays; the justified no-GRU stop is recorded above. |
+| Does a sequence model add beyond the selected B3/98 tree control? | Not yet answered by this historical control: the six-/twelve-month flattened controls are worse on both frozen inner replays, but neural sequence modelling was not tested. |
 | Is any new candidate independently confirmed? | No. |
 
 ## Statistical scope

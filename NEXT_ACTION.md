@@ -1,6 +1,6 @@
-# Next action — hydrological-history branch complete
+# Next action — availability-faithful neural sequence comparison in progress
 
-## 2026-09-08 — Stage C controls stop the sequence branch
+## 2026-09-08 — Stage C direct-history controls (superseded as a neural gate)
 
 - The completed Stage B runs used clean, pinned source
   `545fe9963fe6388eb89e065b9f39afcc233ba081` on `codex/validation-rebuild`.
@@ -28,10 +28,12 @@
   Its 78,524,335-byte remote archive hashes to
   `18ae60a07b4569dd341fbb5086555e3906146b065fe585322779be824f0ae25d` and
   records `no_test_predictions=true`.
-- **Decision:** stop the compact sequence branch before GRU fitting, exactly as
-  predeclared. The evidence supports causal local/regional hydrological
-  summaries over B0 in prior development/stress replays, but does not establish
-  a meaningful B3-over-B2 advantage or direct raw-sequence value beyond B3.
+- **Historical control result:** the compact flattened-tree/ridge controls did
+  not add useful direct local-history signal beyond B3. **Neural sequence
+  modelling was not tested** by that run. Its former no-GRU stop rule is
+  superseded by the separately predeclared availability-faithful MLP/GRU/TCN
+  comparison in `NEURAL_SEQUENCE_EXPERIMENT_PLAN.md`; that comparison retains
+  the failed control result and does not reinterpret it as a neural negative.
   Do not generate Test predictions or a competition submission.
 
 # Next action — local-response stress result
