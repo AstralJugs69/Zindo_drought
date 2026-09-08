@@ -273,7 +273,10 @@ def _fit_baseline(lgb, *, output: Path, candidate: str, origin: str, train_x: pd
 
 
 def _selection(epoch_rows: list[dict[str, object]]) -> dict[str, object]:
-    frame = pd.DataFrame(epoch_rows)
+    frame = pd.DataFrame(epoch_rows).copy()
+    # Keep the declared static-MLP sentinel robust if a future caller supplies
+    # `None`; pandas would otherwise drop that grouping key.
+    frame["span"] = frame["span"].fillna(0).astype(int)
     expected = len(INNER_ORIGINS) * len(SEEDS)
     grouped = frame.groupby(["architecture", "span", "epoch"], sort=True).agg(raw_rmse=("valid_raw_rmse", "mean"), runs=("valid_raw_rmse", "size")).reset_index()
     grouped = grouped.loc[grouped.runs == expected].sort_values(["raw_rmse", "architecture", "span", "epoch"], kind="mergesort")
