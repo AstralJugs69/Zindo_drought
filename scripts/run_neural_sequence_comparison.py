@@ -243,20 +243,21 @@ def _fit_neural(
     curve = pd.DataFrame([{**row, "by_h": json.dumps(row["by_h"], sort_keys=True)} for row in epoch_rows])
     curve.to_csv(run_dir / "curve.csv", index=False)
     best_epoch = min(epoch_rows, key=lambda r: (float(r["valid_raw_rmse"]), int(r["epoch"])))
-    checkpoint = torch.load(checkpoint_by_epoch[int(best_epoch["epoch"])], map_location=device, weights_only=False)
-    model.load_state_dict(checkpoint["state_dict"])
+    checkpoint_path = checkpoint_by_epoch[int(best_epoch["epoch"])]
+    checkpoint_state = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    model.load_state_dict(checkpoint_state["state_dict"])
     best_delta = _predict(torch, model, valid_static, valid_sequence, device=device)
     best_oof = _oof(ledger, labels, best_delta, origin=origin, model=architecture, seed=seed, span=span, epoch=int(best_epoch["epoch"]))
     best_oof.to_csv(run_dir / "best_epoch_oof.csv.gz", index=False, compression="gzip")
     # Model reload proof uses the saved state and persisted normalizers, not the live object.
     restored = make_model(architecture, static_dim=train_static.shape[1], sequence_dim=None if train_sequence is None else train_sequence.shape[2]).to(device)
-    restored.load_state_dict(checkpoint["state_dict"])
+    restored.load_state_dict(checkpoint_state["state_dict"])
     restored_delta = _predict(torch, restored, loaded_static.transform(static_valid), None if sequence_valid is None else loaded_sequence.transform(sequence_valid), device=device)
     if not np.array_equal(best_delta, restored_delta):
         raise AssertionError("checkpoint/preprocessor reload prediction differs")
     _json(run_dir / "manifest.json", {"status": "completed", "run": run_name, "device": str(device), "learnability": learnability,
                                         "best_epoch": best_epoch, "static_columns": static_columns, "sequence_columns": sequence_columns,
-                                        "checkpoint": checkpoint.name, "reload_prediction_equal": True, "elapsed_seconds": time.perf_counter() - started})
+                                        "checkpoint": checkpoint_path.name, "reload_prediction_equal": True, "elapsed_seconds": time.perf_counter() - started})
     return epoch_rows, best_oof
 
 
