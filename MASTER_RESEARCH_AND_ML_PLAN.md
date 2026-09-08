@@ -54,6 +54,13 @@ cleanly. The next fixed decision step is the frozen 2003-04/2004-04 inner
 selection, not a post-hoc outer-replay choice. `HYDROLOGICAL_HISTORY_RESULTS.md`
 is the authoritative per-run artifact/checksum ledger.
 
+The frozen 2003-04/2004-04 inner selection then compared all four 98-round
+candidates. B3/98 has the lowest mean weighted inner RMSE (0.568482991), only
+0.000025043 below B2/98 (0.568508034); B3 wins 2003-04 and B2 wins 2004-04.
+B3 is therefore the mechanically selected Stage C tree control, not a meaningful
+deployment promotion over B2. B1 fails inner directional consistency. Any
+sequence model must now earn its added complexity against that frozen control.
+
 ## 2026-09-08 — bounded local-response experiment (Kaggle-only)
 
 Run `local_response_20260907T220239Z` completed from commit

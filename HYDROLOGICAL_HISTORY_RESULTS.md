@@ -1,8 +1,8 @@
 # Hydrological history results
 
-**Status:** Stage A and all fixed-capacity Stage B outer ablations (B0--B3) are
-completed. The two frozen 2003-04/2004-04 inner replays have not yet selected a
-candidate.
+**Status:** Stage A and all fixed-capacity Stage B outer/inner ablations are
+completed. B3/98 is the frozen Stage B selection by mean inner weighted RMSE;
+the margin over B2 is too small to treat as a practical deployment promotion.
 **Latest trajectory-code SHA:** `545fe9963fe6388eb89e065b9f39afcc233ba081`
 **Execution pin:** pass the checked-out, pushed full `git rev-parse HEAD` value
 to each runner's `--expected-commit`; the runner records it in its manifest.
@@ -132,7 +132,9 @@ The B1 package is
 `/kaggle/working/drought_runs/hydro_trajectory_b1_local_20260908T064928Z.zip`
 (22,109,320 bytes, SHA-256
 `d30136fb4357285fc1173e1050d079e7dfe170f92011888f33b8fb25971828a7`),
-completed in 784.37 s with a 13.422 GiB peak RSS. The B2 package is
+completed in 784.37 s with a 13.422 GiB peak RSS. Its checksum-matched local
+ignored archive is `artifacts/hydro_trajectory_b1_local_20260908T064928Z.zip`.
+The B2 package is
 `/kaggle/working/drought_runs/hydro_trajectory_b2_regional_20260908T070438Z.zip`
 (22,101,247 bytes, SHA-256
 `95b8c2e1230d7a46d0a80e1ab6a428fbfa2b0ce9eec1fd85e6acc09faf62715e`),
@@ -170,6 +172,38 @@ package is
 (13,993,051 bytes, SHA-256
 `3ba286a2e60221e906e26ea58772e716cf8a786e768397a83d8d71a277f36318`).
 
+## Frozen Stage B inner selection
+
+The same fixed 98-round candidates then ran, one candidate per job, on the
+predeclared 2003-04 and 2004-04 template inner replays from clean commit
+`c5591b428ea24bc960ddb172079de70fda957d16`. Each terminal manifest reports
+`no_test_predictions=true`; each source fold has the exact same candidate-row
+hash, labels, replay geometry, and horizon support within its origin.
+
+| Candidate | 2003-04 raw / weighted RMSE | 2004-04 raw / weighted RMSE | Mean inner weighted RMSE | Result |
+|---|---:|---:|---:|---|
+| B0 | 0.582833 / 0.582705 | 0.560782 / 0.560624 | 0.571665 | reference |
+| B1 local | 0.585386 / 0.585258 | 0.557430 / 0.557283 | 0.571270 | fails direction: worse than B0 at 2003-04 |
+| B2 regional | 0.581978 / 0.581879 | **0.555266 / 0.555137** | 0.568508 | consistent B0 improvement |
+| B3 both | **0.580254 / 0.580153** | 0.556942 / 0.556813 | **0.568483** | selected by mean-inner rule |
+
+B3 improves B0 on both inner replays (+0.002579 and +0.003840 raw RMSE), so it
+and B2 clear the direction gate. The predeclared mean-inner weighted rule picks
+`B3_both` at 0.568482991 versus B2's 0.568508034—a **0.000025043** difference.
+That is far too small to establish a meaningful B3-over-B2 deployment advantage,
+but avoids a post-hoc outer-replay choice: the fixed Stage C tree control is
+**B3 at 98 rounds**, and B2 remains a materially competitive simpler reference.
+
+The completed inner packages are remotely durable: B0
+`hydro_trajectory_inner_b0_20260908T111000Z.zip` (15,810,000 bytes, SHA-256
+`09812e43b526e337bcf747570459e7127bf1138970bd529cd2fd03bda65d16ee`), B1
+`hydro_trajectory_inner_b1_local_20260908T112000Z.zip` (15,954,570 bytes,
+SHA-256 `b3366c4fa0af038828ca9b2f4d7f3b1d1b41b0610de875d159268044215c1f94`),
+B2 `hydro_trajectory_inner_b2_regional_20260908T113000Z.zip` (15,835,325
+bytes, SHA-256 `e48793b7950e18c8d3c6e541c8f0002c1e175eb6c70ed90ff30307a561730802`),
+and B3 `hydro_trajectory_inner_b3_both_20260908T114000Z.zip` (15,899,996
+bytes, SHA-256 `eddb642c4570535c397b53b55fb9588f2698422df463937605615a1b1447ddb3`).
+
 ## Implemented and verified
 
 - `scripts/run_history_availability_audit.py` produced the Stage A target-blind
@@ -198,7 +232,7 @@ model-performance evidence.
 | Do regional trajectories add beyond contemporaneous C1? | Yes in these four replays: raw gain +0.002250 to +0.008623. |
 | Does C1/98 transfer to the declared outer replays? | Measured for all four: B0 raw RMSE 0.523809 / 0.559511 / 0.590070 / 0.811981. |
 | Does combined local plus regional history improve all four replays? | Yes versus B0: raw gain +0.002610 to +0.007332; it is not the best single candidate on every replay. |
-| Does a sequence model add beyond equivalent history inputs? | Not started; it remains gated on frozen inner-replay selection after Stage B. |
+| Does a sequence model add beyond the selected B3/98 tree control? | Not started; it is now eligible only as the predeclared compact, mask-aware Stage C comparison. |
 | Is any new candidate independently confirmed? | No. |
 
 ## Statistical scope

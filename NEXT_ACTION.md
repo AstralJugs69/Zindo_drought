@@ -1,6 +1,6 @@
-# Next action — select the Stage B hydrological-history candidate
+# Next action — Stage C history controls after frozen B3 selection
 
-## 2026-09-08 — B0/B1/B2/B3 outer ablations completed
+## 2026-09-08 — B3/98 selected on frozen inner replays
 
 - The completed Stage B runs used clean, pinned source
   `545fe9963fe6388eb89e065b9f39afcc233ba081` on `codex/validation-rebuild`.
@@ -16,11 +16,18 @@
   `3ba286a2e60221e906e26ea58772e716cf8a786e768397a83d8d71a277f36318`; it
   recorded `no_test_predictions=true`, a finite-or-missing 446-column Test
   contract, and no Test prediction.
-- **Next single candidate-selection job:** run fixed 98-round B0/B1/B2/B3 on
-  the predeclared 2003-04 and 2004-04 template inner replays from a clean,
-  pinned checkout. Select only after inspecting both inner metrics, then freeze
-  that candidate/capacity before any Stage C control. Do not generate Test
-  predictions or a competition submission.
+- The frozen 2003-04/2004-04 inner selection completed from clean commit
+  `c5591b428ea24bc960ddb172079de70fda957d16`. B3/98 is selected by the
+  predeclared mean weighted-inner rule (0.568483) over B2/98 (0.568508), but the
+  0.000025 margin is explicitly too small to call a practical B3-over-B2
+  advantage. The full table and checksums are in
+  `HYDROLOGICAL_HISTORY_RESULTS.md`.
+- **Next bounded work:** implement and test the predeclared Stage C data
+  contract, then on Kaggle compare the selected B3/98 tree control with a
+  flattened-history tree control and a prefix-normalized regularized
+  linear/MLP control on the same frozen inner rows. Only if those controls show
+  usable history signal may the two-seed, six-/twelve-month mask-aware GRU run.
+  Do not generate Test predictions or a competition submission.
 
 # Next action — local-response stress result
 
