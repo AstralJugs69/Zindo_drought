@@ -6,6 +6,7 @@ creates historical replay OOF artifacts and model/preprocessor checkpoints.
 from __future__ import annotations
 
 import argparse
+import gc
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -294,6 +295,7 @@ def main() -> None:
     parser.add_argument("--phase", choices=("inner", "outer", "stability", "ablation"), required=True)
     parser.add_argument("--selection", type=Path, help="inner selection.json required outside inner phase")
     parser.add_argument("--epochs", type=int, default=MAX_EPOCHS)
+    parser.add_argument("--origins", help="comma-separated subset of the predeclared origins; intended only to resume a failed origin")
     args = parser.parse_args()
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if head != args.expected_commit:
@@ -309,9 +311,16 @@ def main() -> None:
             raise ValueError("--selection from a completed inner run is required")
         selection = json.loads(args.selection.read_text(encoding="utf-8"))["chosen"]
     started = time.perf_counter()
+    configured_origins = INNER_ORIGINS if args.phase in {"inner", "stability", "ablation"} else OUTER_ORIGINS
+    if args.origins:
+        origins = tuple(part.strip() for part in args.origins.split(",") if part.strip())
+        if not origins or any(origin not in configured_origins for origin in origins):
+            raise ValueError(f"--origins must be a nonempty subset of {configured_origins}")
+    else:
+        origins = configured_origins
     manifest = {"status": "running", "commit": head, "phase": args.phase, "started_at": datetime.now(timezone.utc).isoformat(), "no_test_predictions": True,
                 "seeds": list(SEEDS), "stability_seed": STABILITY_SEED, "spans": list(SPANS), "max_epochs": args.epochs, "per_horizon_cap": PER_HORIZON_CAP,
-                "platform": platform.platform(), "memory_start": _memory()}
+                "platform": platform.platform(), "origins": list(origins), "memory_start": _memory()}
     _json(args.output_dir / "manifest.json", manifest)
     try:
         import lightgbm as lgb
@@ -323,7 +332,6 @@ def main() -> None:
         source = train.loc[:, SOURCE_HYDRO_HISTORY_COLUMNS].copy()
         structural = train.loc[:, ["sample_id", "time", "lat", "lon", "TWS_t"]].copy()
         labels = train.loc[:, ["sample_id", "target"]].copy()
-        origins = INNER_ORIGINS if args.phase in {"inner", "stability", "ablation"} else OUTER_ORIGINS
         baseline_results: list[dict[str, object]] = []; epoch_rows: list[dict[str, object]] = []; all_best_oof: list[pd.DataFrame] = []
         with (args.output_dir / "console.log").open("w", encoding="utf-8") as log:
             _emit(log, {"phase": "start", "origins": origins, "memory": _memory()})
@@ -339,11 +347,17 @@ def main() -> None:
                 if args.phase in {"inner", "outer"}:
                     train_b0 = _b0_matrix(train_rows, view.source, view.structural, maps.regional)
                     valid_b0 = _b0_matrix(fold.ledger, view.source, view.structural, maps.regional)
+                    result = _fit_baseline(lgb, output=args.output_dir, candidate="B0", origin=origin, train_x=train_b0, valid_x=valid_b0, y_train=y_full, weights=weights_full, ledger=fold.ledger, labels=labels)
+                    baseline_results.append(result); _emit(log, {"phase": "baseline_complete", **result})
+                    # Building B3 for late origins is several GiB.  Release B0 before
+                    # materializing it so a failed origin can be resumed within Kaggle's cgroup limit.
+                    del train_b0, valid_b0
+                    gc.collect()
                     train_b3 = build_b3_matrix(train_rows, view.source, view.structural, maps)
-                    for candidate, x_train, x_valid in (("B0", train_b0, valid_b0), ("B3", train_b3, valid_b3)):
-                        result = _fit_baseline(lgb, output=args.output_dir, candidate=candidate, origin=origin, train_x=x_train, valid_x=x_valid, y_train=y_full, weights=weights_full, ledger=fold.ledger, labels=labels)
-                        baseline_results.append(result); _emit(log, {"phase": "baseline_complete", **result})
-                    del train_b0, valid_b0, train_b3
+                    result = _fit_baseline(lgb, output=args.output_dir, candidate="B3", origin=origin, train_x=train_b3, valid_x=valid_b3, y_train=y_full, weights=weights_full, ledger=fold.ledger, labels=labels)
+                    baseline_results.append(result); _emit(log, {"phase": "baseline_complete", **result})
+                    del train_b3
+                    gc.collect()
                 cap_rows = deterministic_horizon_cap(train_rows, per_horizon=PER_HORIZON_CAP)
                 cap_y = _labels(cap_rows, labels); cap_w = np.asarray(horizon_rebalance_weights(cap_rows.h), dtype=np.float32)
                 static_train = build_b3_matrix(cap_rows, view.source, view.structural, maps).to_numpy(dtype=np.float32)

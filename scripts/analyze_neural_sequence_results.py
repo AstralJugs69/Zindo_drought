@@ -37,13 +37,16 @@ def _metric_row(frame: pd.DataFrame, *, label: str) -> dict[str, object]:
     return row
 
 
-def _prepare(run_dir: Path) -> pd.DataFrame:
-    paths = sorted((run_dir / "baseline").glob("*_B3_oof.csv.gz"))
+def _prepare(run_dirs: tuple[Path, ...]) -> pd.DataFrame:
+    paths = sorted(path for run_dir in run_dirs for path in (run_dir / "baseline").glob("*_B3_oof.csv.gz"))
     if not paths:
-        raise FileNotFoundError(f"no B3 OOF files under {run_dir / 'baseline'}")
+        raise FileNotFoundError(f"no B3 OOF files under {run_dirs}")
     baseline = pd.concat((pd.read_csv(path) for path in paths), ignore_index=True)
-    neural_path = run_dir / "neural_best_oof.csv.gz"
-    neural = pd.read_csv(neural_path)
+    neural_paths = [run_dir / "neural_best_oof.csv.gz" for run_dir in run_dirs]
+    missing = [path for path in neural_paths if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"no neural OOF file at {missing}")
+    neural = pd.concat((pd.read_csv(path) for path in neural_paths), ignore_index=True)
     metadata = ["sample_id", "target", "h", "origin", "anchor_age_months", "calendar_block", "geo5"]
     if neural.groupby("sample_id").size().nunique() != 1:
         raise AssertionError("neural seeds do not have complete, equal OOF coverage")
@@ -91,8 +94,9 @@ def _bootstrap(frame: pd.DataFrame, *, block: str, repeats: int, seed: int) -> d
     }
 
 
-def analyze(run_dir: Path, output_dir: Path, *, repeats: int = 200) -> dict[str, object]:
-    frame = _prepare(run_dir)
+def analyze(run_dir: Path | tuple[Path, ...], output_dir: Path, *, repeats: int = 200) -> dict[str, object]:
+    run_dirs = (run_dir,) if isinstance(run_dir, Path) else run_dir
+    frame = _prepare(run_dirs)
     output_dir.mkdir(parents=True, exist_ok=True)
     overall = _metric_row(frame, label="all_outer_oof")
     by_origin = pd.DataFrame(_metric_row(group, label=str(origin)) for origin, group in frame.groupby("origin", sort=True))
@@ -101,7 +105,7 @@ def analyze(run_dir: Path, output_dir: Path, *, repeats: int = 200) -> dict[str,
     by_age = pd.DataFrame(_metric_row(group, label=f"anchor_age_{bucket}") for bucket, group in frame.groupby(age, observed=True, sort=True))
     correlation = float(np.corrcoef(frame.residual_B3, frame.residual_neural)[0, 1])
     report = {
-        "run_dir": str(run_dir),
+        "run_dirs": [str(path) for path in run_dirs],
         "rows": int(len(frame)),
         "official_horizon_weights": {str(key): value for key, value in TEST_H_WEIGHTS.items()},
         "overall": overall,
@@ -119,11 +123,11 @@ def analyze(run_dir: Path, output_dir: Path, *, repeats: int = 200) -> dict[str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--run-dir", type=Path, action="append", required=True, help="one or more completed or mechanically recovered replay roots")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--bootstrap-repeats", type=int, default=200)
     args = parser.parse_args()
-    print(json.dumps(analyze(args.run_dir, args.output_dir, repeats=args.bootstrap_repeats), indent=2, sort_keys=True))
+    print(json.dumps(analyze(tuple(args.run_dir), args.output_dir, repeats=args.bootstrap_repeats), indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
