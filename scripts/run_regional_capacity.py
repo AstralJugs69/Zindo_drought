@@ -116,22 +116,37 @@ def _choose_inner_replays(train: pd.DataFrame, template: pd.DataFrame) -> list[S
     starts = find_exact_template_starts(train, template)
     offsets = sorted(int(v) for v in template["offset_months"].unique())
     max_offset = max(offsets)
-    eligible = [s for s in starts if s + max_offset + 1 < earliest_outer]
+    source_period = pd.to_datetime(train["time"]).dt.to_period("M")
+    min_prefix_rows = 100_000
+    eligible = []
+    for start in starts:
+        if start + max_offset + 1 >= earliest_outer:
+            continue
+        # Training examples for an inner replay must have targets strictly
+        # before the replay origin. Because target month is source+1, source
+        # month must be <= start-2. Require a non-tiny prefix so capacity
+        # selection is not decided by an unstable startup fragment.
+        prefix_rows = int((source_period <= start - 2).sum())
+        if prefix_rows >= min_prefix_rows:
+            eligible.append(start)
     if len(eligible) < 2:
-        raise AssertionError(f"need two inner replay starts before {earliest_outer}, found {len(eligible)}")
+        raise AssertionError(
+            f"need two inner replay starts before {earliest_outer} with at least "
+            f"{min_prefix_rows} prefix rows, found {len(eligible)}"
+        )
     # The 40-month transplanted Test geometry makes two fully disjoint inner
     # target calendars impossible before the earliest outer origin. Freeze the
     # deterministic pair with minimum target-month overlap instead. Ties favor
     # wider temporal separation, then the latest second replay. This uses only
-    # calendar structure; no labels or scores participate in the choice.
+    # calendar/source-coverage structure; no labels or scores participate.
     pairs: list[tuple[int, int, pd.Period, pd.Period]] = []
-    for i, a in enumerate(eligible):
-        ta = {a + off + 1 for off in offsets}
-        for b in eligible[i + 1:]:
-            tb = {b + off + 1 for off in offsets}
-            overlap = len(ta.intersection(tb))
-            separation = int(b.ordinal - a.ordinal)
-            pairs.append((overlap, -separation, a, b))
+    for i, first in enumerate(eligible):
+        first_targets = {first + off + 1 for off in offsets}
+        for second in eligible[i + 1:]:
+            second_targets = {second + off + 1 for off in offsets}
+            overlap = len(first_targets.intersection(second_targets))
+            separation = int(second.ordinal - first.ordinal)
+            pairs.append((overlap, -separation, first, second))
     if not pairs:
         raise AssertionError("could not freeze two inner replay calendars")
     _, _, first, second = min(pairs, key=lambda x: (x[0], x[1], -x[3].ordinal))
@@ -278,7 +293,9 @@ def main() -> None:
             "target_months": sorted(str(p) for p in _target_months(f)),
             "h_counts": {str(k): int(v) for k, v in f.ledger.h.value_counts().sort_index().items()},
         } for f in inner_folds]
+        inner_overlap = sorted(str(p) for p in _target_months(inner_folds[0]).intersection(_target_months(inner_folds[1])))
         prefit = {"outer": outer_structural, "inner": inner_structural,
+                  "inner_target_overlap": inner_overlap,
                   "recent_target_overlap": sorted(set(outer_structural["2014-04"]["target_months"]).intersection(
                       outer_structural["2014-12"]["target_months"])),
                   "reserved_transfer": reserved, "test_contract": test_contract}
