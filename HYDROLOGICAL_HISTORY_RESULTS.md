@@ -5,7 +5,8 @@ completed. B3/98 is the frozen Stage B selection by mean inner weighted RMSE;
 the margin over B2 is too small to treat as a practical deployment promotion.
 **Stage B runner provenance:** outer B1/B2/B3 runs used
 `545fe9963fe6388eb89e065b9f39afcc233ba081`; the inner-fold extension and
-selection runs used `c5591b428ea24bc960ddb172079de70fda957d16`.
+selection runs used `c5591b428ea24bc960ddb172079de70fda957d16`; Stage C
+controls used `3eacd99130cb278cdd69b7b5871b0730dbdaa6a0`.
 **Execution pin:** pass the checked-out, pushed full `git rev-parse HEAD` value
 to each runner's `--expected-commit`; the runner records it in its manifest.
 **Environment:** the repaired Kaggle checkout and experiment root are writable
@@ -207,6 +208,46 @@ bytes, SHA-256 `e48793b7950e18c8d3c6e541c8f0002c1e175eb6c70ed90ff30307a561730802
 and B3 `hydro_trajectory_inner_b3_both_20260908T114000Z.zip` (15,899,996
 bytes, SHA-256 `eddb642c4570535c397b53b55fb9588f2698422df463937605615a1b1447ddb3`).
 
+## Stage C — direct-history controls; sequence branch stopped
+
+Kaggle run `hydro_sequence_controls_20260908T120000Z` completed from clean
+commit `3eacd99130cb278cdd69b7b5871b0730dbdaa6a0` in 584.15 s. It reconstructs
+fixed six- and twelve-calendar-month local hydrology grids with explicit
+per-variable observation masks and true calendar-offset channels. The flattened
+tree controls append that direct history to the selected 446-column B3/98
+static block. The ridge controls use the same features, missing indicators, and
+a fixed alpha=1000 with medians/centers/scales fitted only from each training
+prefix. Test was used only to reconstruct frozen replay geometry; no Test
+feature prediction, competition prediction, or submission was made.
+
+| Candidate | 2003-04 raw / weighted RMSE | Gain vs B3 raw | 2004-04 raw / weighted RMSE | Gain vs B3 raw |
+|---|---:|---:|---:|---:|
+| B3/98 tree reference | **0.580254 / 0.580153** | — | **0.556942 / 0.556813** | — |
+| Flattened tree, 6 months | 0.581004 / 0.580908 | -0.000751 | 0.557140 / 0.557011 | -0.000198 |
+| Flattened tree, 12 months | 0.583449 / 0.583347 | -0.003196 | 0.558067 / 0.557932 | -0.001124 |
+| Prefix-normalized ridge, 6 months | 0.619102 / 0.619002 | -0.038849 | 1.566490 / 1.566394 | -1.009548 |
+| Prefix-normalized ridge, 12 months | 0.788872 / 0.788772 | -0.208619 | 1.060587 / 1.060624 | -0.503644 |
+
+The tree reference exactly reproduced B3's selected inner scores and row hashes.
+Neither direct-history tree improves either frozen replay; both ridge controls
+are substantially worse. Therefore the Stage C prerequisite—an equivalent
+flattened-history control with usable signal beyond B3—is falsified. Per the
+predeclared stopping rule, **no GRU or other neural sequence model was fit**.
+This rejects the tested compact local raw-sequence formulation, not all possible
+future sequence architectures.
+
+The remote archive is
+`/kaggle/working/drought_runs/hydro_sequence_controls_20260908T120000Z.zip`
+(78,524,335 bytes, SHA-256
+`18ae60a07b4569dd341fbb5086555e3906146b065fe585322779be824f0ae25d`). Its
+terminal manifest records 10 result rows, `no_test_predictions=true`, a 13.971
+GiB peak RSS, and 5.640 GiB minimum available memory.
+The small local ignored decision record is durable at
+`artifacts/hydro_sequence_controls_20260908T120000Z.manifest.json` and
+`artifacts/hydro_sequence_controls_20260908T120000Z.metrics.json`; the latter
+matches the manifest's `metrics.json` SHA-256
+`b14fbfbd1f8401faac2b665b809ead1104cd6eca831177b7ec2eed16ab813853`.
+
 ## Implemented and verified
 
 - `scripts/run_history_availability_audit.py` produced the Stage A target-blind
@@ -220,10 +261,10 @@ bytes, SHA-256 `eddb642c4570535c397b53b55fb9588f2698422df463937605615a1b1447ddb3
   parity but never predicts Test targets or creates a submission.
 - `WINNER_METHOD_AUDIT.md` records source/code evidence and transfer limits.
 
-Local verification at `545fe99`: `python -m pytest -q` passed **30 tests**;
-syntax compilation passed for the trajectory runner. On the executing Kaggle
-environment, `tests/test_hydro_trajectory.py` passed **4/4** after the
-continuous-memory tracker was added. This is implementation verification, not
+Local verification at `3eacd99`: `python -m pytest -q` passed **33 tests**;
+syntax compilation passed for the trajectory and Stage C control runners. On
+the executing Kaggle environment, `tests/test_hydro_trajectory.py` passed
+**7/7** before Stage C. This is implementation verification, not
 model-performance evidence.
 
 ## Unanswered questions
@@ -235,7 +276,7 @@ model-performance evidence.
 | Do regional trajectories add beyond contemporaneous C1? | Yes in these four replays: raw gain +0.002250 to +0.008623. |
 | Does C1/98 transfer to the declared outer replays? | Measured for all four: B0 raw RMSE 0.523809 / 0.559511 / 0.590070 / 0.811981. |
 | Does combined local plus regional history improve all four replays? | Yes versus B0: raw gain +0.002610 to +0.007332; it is not the best single candidate on every replay. |
-| Does a sequence model add beyond the selected B3/98 tree control? | Not started; it is now eligible only as the predeclared compact, mask-aware Stage C comparison. |
+| Does a sequence model add beyond the selected B3/98 tree control? | The six-/twelve-month direct-history controls are worse on both frozen inner replays; the justified no-GRU stop is recorded above. |
 | Is any new candidate independently confirmed? | No. |
 
 ## Statistical scope

@@ -61,6 +61,18 @@ B3 is therefore the mechanically selected Stage C tree control, not a meaningful
 deployment promotion over B2. B1 fails inner directional consistency. Any
 sequence model must now earn its added complexity against that frozen control.
 
+## 2026-09-08 — Stage C sequence stop
+
+The compact Stage C control run reproduced B3/98 exactly on both frozen inner
+replays, then tested direct local raw-hydrology calendar grids at six and twelve
+months with explicit masks/elapsed offsets. Both flattened-tree controls were
+worse than B3 on both replays (raw deltas -0.000751/-0.000198 for six months and
+-0.003196/-0.001124 for twelve). Fixed prefix-normalized ridge controls were
+substantially worse. The Stage C prerequisite for a GRU—evidence that the
+equivalent direct-history control adds usable signal—therefore fails. Stop the
+sequence branch without fitting a GRU; this is a formulation-specific negative
+result, not a claim that no possible neural sequence model could ever help.
+
 ## 2026-09-08 — bounded local-response experiment (Kaggle-only)
 
 Run `local_response_20260907T220239Z` completed from commit

@@ -1,6 +1,6 @@
-# Next action — Stage C history controls after frozen B3 selection
+# Next action — hydrological-history branch complete
 
-## 2026-09-08 — B3/98 selected on frozen inner replays
+## 2026-09-08 — Stage C controls stop the sequence branch
 
 - The completed Stage B runs used clean, pinned source
   `545fe9963fe6388eb89e065b9f39afcc233ba081` on `codex/validation-rebuild`.
@@ -22,11 +22,16 @@
   0.000025 margin is explicitly too small to call a practical B3-over-B2
   advantage. The full table and checksums are in
   `HYDROLOGICAL_HISTORY_RESULTS.md`.
-- **Next bounded work:** implement and test the predeclared Stage C data
-  contract, then on Kaggle compare the selected B3/98 tree control with a
-  flattened-history tree control and a prefix-normalized regularized
-  linear/MLP control on the same frozen inner rows. Only if those controls show
-  usable history signal may the two-seed, six-/twelve-month mask-aware GRU run.
+- Stage C run `hydro_sequence_controls_20260908T120000Z` reproduced B3/98,
+  then found both six-/twelve-month flattened history trees worse on both
+  frozen inner replays; fixed prefix-normalized ridge controls were much worse.
+  Its 78,524,335-byte remote archive hashes to
+  `18ae60a07b4569dd341fbb5086555e3906146b065fe585322779be824f0ae25d` and
+  records `no_test_predictions=true`.
+- **Decision:** stop the compact sequence branch before GRU fitting, exactly as
+  predeclared. The evidence supports causal local/regional hydrological
+  summaries over B0 in prior development/stress replays, but does not establish
+  a meaningful B3-over-B2 advantage or direct raw-sequence value beyond B3.
   Do not generate Test predictions or a competition submission.
 
 # Next action — local-response stress result
