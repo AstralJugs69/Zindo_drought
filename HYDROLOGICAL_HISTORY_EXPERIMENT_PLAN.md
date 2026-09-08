@@ -22,12 +22,14 @@ smoothing, target-derived regional value, or compressed elapsed time is allowed.
 The Test file is read only for schema, source-field availability, and its supplied
 mask/template; it is never used for a target or a competition prediction.
 
-`B0` is the verified combined 5-degree + 15-degree regional model (`C1`) at the
-inner-selected 98 rounds, 63 leaves, and `min_data_in_leaf=1000`.  Its fixed
-development raw RMSE is 0.527274, 0.567747, 0.599374, and 0.808313 at the
-2007-09, 2009-01, 2014-04, and 2014-12 h=1..7 replays respectively.  The
-historical inner capacity replays are 2003-04 and 2004-04; their five target
-months overlap and are selection evidence only.
+The verified current comparison is combined 5-degree + 15-degree regional C1 at
+the C0-matched 59 rounds (63 leaves, `min_data_in_leaf=1000`), with raw RMSE
+0.527274, 0.567747, 0.599374, and 0.808313 at the 2007-09, 2009-01, 2014-04,
+and 2014-12 h=1..7 replays. C1 selected 98 rounds on the two historical inner
+capacity replays, but its outer 98-round score has not been run. The Stage B
+pilot first establishes this `B0=C1/98` fixed-capacity comparator, then B1--B3
+use the identical 98-round capacity. The inner replays are 2003-04 and 2004-04;
+their five target months overlap and are selection evidence only.
 
 ## Stage A — feature availability and shift audit
 
@@ -64,7 +66,7 @@ unavailable observations.
 
 | Candidate | Features beyond B0 | First comparison |
 |---|---|---|
-| `B0` | none | frozen current C1/98 comparator |
+| `B0` | none | first establish the inner-selected C1/98 comparator |
 | `B1_local` | local trajectory block | B0 + local block at 98 rounds |
 | `B2_regional` | regional trajectory block | B0 + regional block at 98 rounds |
 | `B3_both` | local + regional trajectory blocks | B0 + both blocks at 98 rounds |

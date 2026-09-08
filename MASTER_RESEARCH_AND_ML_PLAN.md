@@ -9,6 +9,27 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
+## 2026-09-08 — hydrological history implementation checkpoint
+
+The completed regional artifact establishes that combined contemporaneous 5-degree
+and 15-degree hydrological context helps at the C0-matched 59-round capacity on
+four development/stress replays. It does **not** contain an outer C1/98 result:
+98 rounds were selected only from the two overlapping inner replays. This
+distinction is now enforced in `HYDROLOGICAL_HISTORY_RESULTS.md`.
+
+Commit `5f7274c6999d68917e2a982d5ca2b8908be33aca` adds a predeclared,
+availability-safe Stage A audit and B0/B1/B2/B3 causal trajectory ablation. The
+new local and regional summaries use only source covariates through the event's
+actual calendar month, retain missing support, and exclude TWS/target values.
+They are tested locally but have not been fitted or scored.
+
+Kaggle execution is paused by a reproducible filesystem condition rather than a
+scientific decision: the SSH user can read the root-owned checkout and prior
+artifacts but cannot write `.git/FETCH_HEAD`, the worktree, or the required
+experiment root. No alternative writable location will be silently substituted.
+`NEXT_ACTION.md` records the exact permission verification and safe restart
+sequence. No Test predictions or submissions were generated.
+
 ## 2026-09-08 — bounded local-response experiment (Kaggle-only)
 
 Run `local_response_20260907T220239Z` completed from commit

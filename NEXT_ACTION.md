@@ -1,3 +1,67 @@
+# Next action — Kaggle write-permission recovery and hydrological-history run
+
+## 2026-09-08 — durable checkpoint at `5f7274c`
+
+- GitHub branch `codex/validation-rebuild` is at
+  `5f7274c6999d68917e2a982d5ca2b8908be33aca`. It contains the predeclared
+  `HYDROLOGICAL_HISTORY_EXPERIMENT_PLAN.md`, the source/code-backed
+  `WINNER_METHOD_AUDIT.md`, Stage A audit runner, causal trajectory builder,
+  paired B0--B3 runner, unit tests, and `HYDROLOGICAL_HISTORY_RESULTS.md`.
+- Local static verification at this SHA: `python -m pytest -q` → **29 passed**;
+  `python -m py_compile src/hydro_trajectory.py
+  scripts/run_history_availability_audit.py scripts/run_hydrological_trajectory.py`
+  passed. No local ML fitting/scoring was performed.
+- SSH itself is verified: `kaggle@cec9adbb42fd`. The remote checkout remains at
+  `9b0080cc9f60b4e765ef8b0e069cccc50defe84e`, clean but intentionally three
+  commits ahead of the old origin before the subsequent local push.
+- **Blocker:** `/kaggle/working/Zindo_drought` and its `.git` directory are
+  `root:root` and non-writable to the SSH user `kaggle` (mode 755); `.git/FETCH_HEAD`
+  is `root:root` mode 644. `/kaggle/working/drought_runs` is under the same
+  non-writable root. `git pull --ff-only origin codex/validation-rebuild` fails
+  with `error: cannot open .git/FETCH_HEAD: Permission denied`. Do not modify
+  SSH keys/agent/host checking, reset the checkout, or use an alternate artifact
+  directory as a silent substitute.
+- Required recovery: a Kaggle environment owner must make the existing checkout
+  and experiment root writable to `kaggle`, or recreate them as `kaggle` while
+  preserving the existing session-local artifacts. Verify all three after repair:
+
+  ```bash
+  test -w /kaggle/working/Zindo_drought
+  test -w /kaggle/working/Zindo_drought/.git
+  test -w /kaggle/working/drought_runs
+  ```
+
+- Then, without reset, fast-forward and pin the source:
+
+  ```bash
+  cd /kaggle/working/Zindo_drought
+  git pull --ff-only origin codex/validation-rebuild
+  git rev-parse HEAD
+  git status --short --branch
+  ```
+
+  Expected HEAD is `5f7274c6999d68917e2a982d5ca2b8908be33aca` and the tree
+  must be clean before a run.
+
+- Execution order after recovery (one process at a time; no Test predictions):
+
+  ```bash
+  python -u scripts/run_history_availability_audit.py \
+    --data-dir /kaggle/input/datasets/cashgenenator/drought \
+    --output-dir /kaggle/working/drought_runs/history_availability_audit_<UTC> \
+    --expected-commit 5f7274c6999d68917e2a982d5ca2b8908be33aca
+
+  python -u scripts/run_hydrological_trajectory.py \
+    --data-dir /kaggle/input/datasets/cashgenenator/drought \
+    --output-dir /kaggle/working/drought_runs/hydro_trajectory_pilot_<UTC> \
+    --expected-commit 5f7274c6999d68917e2a982d5ca2b8908be33aca \
+    --origins 2007-09 --candidates B0 --rounds 98
+  ```
+
+- Inspect the pilot's source-map build, elapsed time, memory, Test feature
+  contract, manifest, and log before launching the full B0/B1/B2/B3 paired
+  ablation. Do not reinterpret existing C1/59 metrics as C1/98 metrics.
+
 # Next action — local-response stress result
 
 ## 2026-09-08 — verified rerun at provenance-hardened commit
