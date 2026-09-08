@@ -9,7 +9,7 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
-## 2026-09-08 — hydrological history implementation checkpoint
+## 2026-09-08 — hydrological history Stage A checkpoint
 
 The completed regional artifact establishes that combined contemporaneous 5-degree
 and 15-degree hydrological context helps at the C0-matched 59-round capacity on
@@ -17,18 +17,17 @@ four development/stress replays. It does **not** contain an outer C1/98 result:
 98 rounds were selected only from the two overlapping inner replays. This
 distinction is now enforced in `HYDROLOGICAL_HISTORY_RESULTS.md`.
 
-Commit `5f7274c6999d68917e2a982d5ca2b8908be33aca` adds a predeclared,
+Commit `1810664d9145c07e2ebc7497555a5da63522a3a2` contains the predeclared,
 availability-safe Stage A audit and B0/B1/B2/B3 causal trajectory ablation. The
 new local and regional summaries use only source covariates through the event's
 actual calendar month, retain missing support, and exclude TWS/target values.
-They are tested locally but have not been fitted or scored.
-
-Kaggle execution is paused by a reproducible filesystem condition rather than a
-scientific decision: the SSH user can read the root-owned checkout and prior
-artifacts but cannot write `.git/FETCH_HEAD`, the worktree, or the required
-experiment root. No alternative writable location will be silently substituted.
-`NEXT_ACTION.md` records the exact permission verification and safe restart
-sequence. No Test predictions or submissions were generated.
+Kaggle run `history_availability_audit_20260908T055537Z` completed in 209.57 s
+without Test predictions. It found all 56 B0 features available in Test, with
+the same 893 five-degree cells and no unseen horizon/season/geo strata. Broad
+and h/season/geo-matched spatial domain AUCs were 0.936608 and 0.900016,
+respectively. This is a meaningful disjoint-calendar distribution-shift warning,
+not a feature promotion or a schema defect. The next bounded action is the
+fixed 98-round B0 outer reference before assessing any trajectory candidate.
 
 ## 2026-09-08 — bounded local-response experiment (Kaggle-only)
 

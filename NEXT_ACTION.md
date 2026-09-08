@@ -1,67 +1,41 @@
-# Next action — Kaggle write-permission recovery and hydrological-history run
+# Next action — Stage B hydrological-history reference
 
-## 2026-09-08 — durable checkpoint
+## 2026-09-08 — Stage A completed; start B0 reference only
 
-- GitHub branch `codex/validation-rebuild` contains the predeclared
-  `HYDROLOGICAL_HISTORY_EXPERIMENT_PLAN.md`, the source/code-backed
-  `WINNER_METHOD_AUDIT.md`, Stage A audit runner, causal trajectory builder,
-  paired B0--B3 runner, unit tests, and `HYDROLOGICAL_HISTORY_RESULTS.md`.
-- Local static verification at this SHA: `python -m pytest -q` → **29 passed**;
-  `python -m py_compile src/hydro_trajectory.py
-  scripts/run_history_availability_audit.py scripts/run_hydrological_trajectory.py`
-  passed. No local ML fitting/scoring was performed.
-- SSH itself is verified: `kaggle@cec9adbb42fd`. The remote checkout remains at
-  `9b0080cc9f60b4e765ef8b0e069cccc50defe84e`, clean but intentionally three
-  commits ahead of the old origin before the subsequent local push.
-- **Blocker:** `/kaggle/working/Zindo_drought` and its `.git` directory are
-  `root:root` and non-writable to the SSH user `kaggle` (mode 755); `.git/FETCH_HEAD`
-  is `root:root` mode 644. `/kaggle/working/drought_runs` is under the same
-  non-writable root. `git pull --ff-only origin codex/validation-rebuild` fails
-  with `error: cannot open .git/FETCH_HEAD: Permission denied`. Do not modify
-  SSH keys/agent/host checking, reset the checkout, or use an alternate artifact
-  directory as a silent substitute.
-- Required recovery: a Kaggle environment owner must make the existing checkout
-  and experiment root writable to `kaggle`, or recreate them as `kaggle` while
-  preserving the existing session-local artifacts. Verify all three after repair:
-
-  ```bash
-  test -w /kaggle/working/Zindo_drought
-  test -w /kaggle/working/Zindo_drought/.git
-  test -w /kaggle/working/drought_runs
-  ```
-
-- Then, without reset, fast-forward and pin the source:
+- The repaired Kaggle checkout is writable and is clean at
+  `1810664d9145c07e2ebc7497555a5da63522a3a2` while this checkpoint is written.
+  Do not reset it: the preceding three Kaggle-only commits are intentional.
+- Stage A run `history_availability_audit_20260908T055537Z` completed in
+  209.57 s. All 56 B0 features are available in Test, and no Test horizon,
+  season, or five-degree cell is outside historical support. Broad and matched
+  spatial domain AUCs are 0.936608 and 0.900016. Treat the latter as a
+  temporal-shift warning, not as a reason to discard the causal B0 protocol.
+- The compact remote bundle is
+  `/kaggle/working/drought_runs/history_availability_audit_20260908T055537Z/audit_artifacts.zip`
+  (SHA-256 `7f20174f4894a45c8ee1afd856f43efd6b6b08a24616a1c66e3c25a8d65d2788`);
+  its checksum-matched local Git-ignored copy is
+  `artifacts/history_availability_audit_20260908T055537Z.zip`.
+- **Next single run:** establish the missing outer C1/98-capacity reference as
+  B0 at one origin before any B1/B2/B3 candidate. It produces OOF diagnostics,
+  feature-schema parity checks, and model artifacts only—never Test predictions
+  or a submission.
 
   ```bash
   cd /kaggle/working/Zindo_drought
-  git pull --ff-only origin codex/validation-rebuild
-  git rev-parse HEAD
   git status --short --branch
-  ```
-
-  Record the full resulting `HEAD` as `expected_commit`; it must be the pushed
-  branch tip and the tree must be clean before a run.
-
-- Execution order after recovery (one process at a time; no Test predictions):
-
-  ```bash
   expected_commit=$(git rev-parse HEAD)
-
-  python -u scripts/run_history_availability_audit.py \
-    --data-dir /kaggle/input/datasets/cashgenenator/drought \
-    --output-dir /kaggle/working/drought_runs/history_availability_audit_<UTC> \
-    --expected-commit "$expected_commit"
 
   python -u scripts/run_hydrological_trajectory.py \
     --data-dir /kaggle/input/datasets/cashgenenator/drought \
-    --output-dir /kaggle/working/drought_runs/hydro_trajectory_pilot_<UTC> \
+    --output-dir /kaggle/working/drought_runs/hydro_trajectory_b0_pilot_<UTC> \
     --expected-commit "$expected_commit" \
     --origins 2007-09 --candidates B0 --rounds 98
   ```
 
-- Inspect the pilot's source-map build, elapsed time, memory, Test feature
-  contract, manifest, and log before launching the full B0/B1/B2/B3 paired
-  ablation. Do not reinterpret existing C1/59 metrics as C1/98 metrics.
+- Inspect source-map construction, elapsed time, peak memory, Test feature
+  contract, OOF/model count, manifest and log. If the pilot finishes cleanly,
+  run fixed 98-round B0 across the remaining declared origins before evaluating
+  B1/B2/B3. Do not reinterpret the inherited C1/59 metrics as C1/98 metrics.
 
 # Next action — local-response stress result
 
