@@ -1,7 +1,9 @@
 # Hydrological history results
 
 **Status:** execution checkpoint — no new Stage A/B model fit has been run.  
-**Latest implementation SHA:** `5f7274c6999d68917e2a982d5ca2b8908be33aca`  
+**Latest trajectory-code SHA:** `5f7274c6999d68917e2a982d5ca2b8908be33aca`  
+**Execution pin:** pass the checked-out, pushed full `git rev-parse HEAD` value
+to each runner's `--expected-commit`; the runner records it in its manifest.  
 **Reason:** the verified Kaggle SSH account can read but cannot write the
 root-owned checkout or `/kaggle/working/drought_runs`; see `NEXT_ACTION.md`.
 

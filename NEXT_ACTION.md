@@ -1,9 +1,8 @@
 # Next action — Kaggle write-permission recovery and hydrological-history run
 
-## 2026-09-08 — durable checkpoint at `5f7274c`
+## 2026-09-08 — durable checkpoint
 
-- GitHub branch `codex/validation-rebuild` is at
-  `5f7274c6999d68917e2a982d5ca2b8908be33aca`. It contains the predeclared
+- GitHub branch `codex/validation-rebuild` contains the predeclared
   `HYDROLOGICAL_HISTORY_EXPERIMENT_PLAN.md`, the source/code-backed
   `WINNER_METHOD_AUDIT.md`, Stage A audit runner, causal trajectory builder,
   paired B0--B3 runner, unit tests, and `HYDROLOGICAL_HISTORY_RESULTS.md`.
@@ -40,21 +39,23 @@
   git status --short --branch
   ```
 
-  Expected HEAD is `5f7274c6999d68917e2a982d5ca2b8908be33aca` and the tree
-  must be clean before a run.
+  Record the full resulting `HEAD` as `expected_commit`; it must be the pushed
+  branch tip and the tree must be clean before a run.
 
 - Execution order after recovery (one process at a time; no Test predictions):
 
   ```bash
+  expected_commit=$(git rev-parse HEAD)
+
   python -u scripts/run_history_availability_audit.py \
     --data-dir /kaggle/input/datasets/cashgenenator/drought \
     --output-dir /kaggle/working/drought_runs/history_availability_audit_<UTC> \
-    --expected-commit 5f7274c6999d68917e2a982d5ca2b8908be33aca
+    --expected-commit "$expected_commit"
 
   python -u scripts/run_hydrological_trajectory.py \
     --data-dir /kaggle/input/datasets/cashgenenator/drought \
     --output-dir /kaggle/working/drought_runs/hydro_trajectory_pilot_<UTC> \
-    --expected-commit 5f7274c6999d68917e2a982d5ca2b8908be33aca \
+    --expected-commit "$expected_commit" \
     --origins 2007-09 --candidates B0 --rounds 98
   ```
 
