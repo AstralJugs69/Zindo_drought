@@ -66,6 +66,83 @@ def _error_budget(frame: pd.DataFrame) -> tuple[list[dict[str, object]], list[di
     return rows, blocks
 
 
+
+def _project_residuals_by_date(
+    oof: pd.DataFrame,
+    basis: np.ndarray,
+    lookup: dict[tuple[float, float], int],
+    *,
+    origin: str,
+    requested_rank: int,
+) -> list[dict[str, object]]:
+    """Project residuals independently by date onto a fixed past-fitted basis."""
+    if basis.ndim != 2:
+        raise ValueError("basis must be 2-D")
+    rank_used = int(basis.shape[1])
+    rows: list[dict[str, object]] = []
+    x = oof.copy()
+    if "err" not in x.columns:
+        x["err"] = x["truth"] - x["prediction"]
+    for date, day in x.groupby("source_date", sort=True):
+        loc = [lookup.get((float(a), float(b))) for a, b in zip(day.lat, day.lon)]
+        keep = np.asarray([i is not None for i in loc], dtype=bool)
+        all_residual = day["err"].to_numpy(float)
+        all_sse = float(np.square(all_residual).sum())
+        if keep.any() and rank_used:
+            residual = day.loc[keep, "err"].to_numpy(float)
+            design = basis[np.asarray([loc[i] for i in np.flatnonzero(keep)], dtype=int), :]
+            coef, *_ = np.linalg.lstsq(design, residual, rcond=None)
+            fitted = design @ coef
+            supported_sse = float(np.square(residual).sum())
+            remaining = float(np.square(residual - fitted).sum())
+            explained = supported_sse - remaining
+            numerical_rank = int(np.linalg.matrix_rank(design))
+            condition = float(np.linalg.cond(design)) if design.shape[1] else None
+        else:
+            supported_sse = remaining = explained = 0.0
+            numerical_rank = 0
+            condition = None
+        rows.append({
+            "origin": origin,
+            "source_date": str(date),
+            "rank": requested_rank,
+            "requested_rank": requested_rank,
+            "rank_used": rank_used,
+            "rows": int(keep.sum()),
+            "all_rows": int(len(day)),
+            "unsupported_rows": int((~keep).sum()),
+            "coverage": float(keep.mean()) if len(keep) else 0.0,
+            "all_finite_sse": all_sse,
+            "raw_sse": supported_sse,
+            "remaining_sse": remaining,
+            "explained_sse": explained,
+            "fraction_residual_sse": float(explained / max(supported_sse, 1e-12)),
+            "numerical_rank": numerical_rank,
+            "condition_number": condition,
+            "label": "ORACLE_DIAGNOSTIC",
+        })
+    return rows
+
+
+def _aggregate_projection_opportunity(projections: pd.DataFrame, error_budget: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate opportunity without repeating the all-finite denominator by rank/date."""
+    if projections.empty:
+        return pd.DataFrame()
+    agg = projections.groupby(["origin", "rank"], as_index=False).agg(
+        supported_rows=("rows", "sum"), supported_sse=("raw_sse", "sum"),
+        explained_sse=("explained_sse", "sum"), remaining_sse=("remaining_sse", "sum"),
+        unsupported_rows=("unsupported_rows", "sum"),
+        rank_used=("rank_used", "max"),
+    )
+    # error_budget has exactly one row per origin/date and is independent of the
+    # number of requested projection ranks, so the denominator cannot multiply.
+    all_sse = error_budget.groupby("origin")["sse"].sum().rename("all_finite_sse")
+    agg = agg.join(all_sse, on="origin")
+    agg["supported_opportunity"] = agg["explained_sse"] / agg["supported_sse"].clip(lower=1e-12)
+    agg["all_finite_opportunity"] = agg["explained_sse"] / agg["all_finite_sse"].clip(lower=1e-12)
+    agg["label"] = "ORACLE_DIAGNOSTIC"
+    return agg
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", type=Path, required=True)
@@ -109,38 +186,16 @@ def main() -> None:
             basis_rows.append({"origin": origin, **requested_meta})
             if basis.size == 0:
                 continue
-            for date, day in oof.groupby("source_date", sort=True):
-                loc = [lookup.get((float(a), float(b))) for a, b in zip(day.lat, day.lon)]
-                keep = np.array([i is not None for i in loc])
-                if not keep.any():
-                    continue
-                residual = (day.loc[keep, "truth"] - day.loc[keep, "prediction"]).to_numpy(float)
-                design = basis[np.asarray([loc[i] for i in np.flatnonzero(keep)], dtype=int), :]
-                coef, *_ = np.linalg.lstsq(design, residual, rcond=None)
-                fitted = design @ coef
-                raw_sse = float(np.square(residual).sum())
-                explained = float(raw_sse - np.square(residual - fitted).sum())
-                projections.append({"origin": origin, "source_date": date, "rank": rank, "rows": int(keep.sum()), "coverage": float(keep.mean()), "raw_sse": raw_sse, "remaining_sse": float(np.square(residual - fitted).sum()), "explained_sse": explained, "fraction_residual_sse": float(explained / max(raw_sse, 1e-12)), "numerical_rank": int(np.linalg.matrix_rank(design)), "condition_number": float(np.linalg.cond(design)) if design.shape[1] else None, "label": "ORACLE_DIAGNOSTIC"})
+            projections.extend(_project_residuals_by_date(
+                oof, basis, lookup, origin=origin, requested_rank=rank
+            ))
     pd.DataFrame(all_budget).to_csv(args.output_dir / "error_budget_by_date.csv", index=False)
     pd.DataFrame(all_blocks).to_csv(args.output_dir / "error_budget_by_block.csv", index=False)
     pd.DataFrame(basis_rows).to_csv(args.output_dir / "basis_fit_summary.csv", index=False)
     proj = pd.DataFrame(projections)
     proj.to_csv(args.output_dir / "oracle_basis_projection_by_date.csv", index=False)
     if not proj.empty:
-        agg = proj.groupby(["origin", "rank"], as_index=False).agg(
-            supported_rows=("rows", "sum"), supported_sse=("raw_sse", "sum"),
-            explained_sse=("explained_sse", "sum"), remaining_sse=("remaining_sse", "sum"))
-        agg["supported_opportunity"] = agg["explained_sse"] / agg["supported_sse"].clip(lower=1e-12)
-        # Denominator is computed once from every finite OOF residual, including
-        # locations unsupported by the historical basis and without repeating it
-        # for each requested rank/date projection.
-        # Reconstruct from the emitted per-date error budget, which covers all
-        # finite OOF rows exactly once.
-        budget_df = pd.DataFrame(all_budget)
-        all_sse = budget_df.groupby("origin")["sse"].sum().rename("all_finite_sse")
-        agg = agg.join(all_sse, on="origin")
-        agg["all_finite_opportunity"] = agg["explained_sse"] / agg["all_finite_sse"].clip(lower=1e-12)
-        agg["label"] = "ORACLE_DIAGNOSTIC"
+        agg = _aggregate_projection_opportunity(proj, pd.DataFrame(all_budget))
         agg.to_csv(args.output_dir / "oracle_basis_projection_aggregate.csv", index=False)
     else:
         pd.DataFrame().to_csv(args.output_dir / "oracle_basis_projection_aggregate.csv", index=False)
