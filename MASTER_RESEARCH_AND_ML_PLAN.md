@@ -29,6 +29,16 @@ respectively. This is a meaningful disjoint-calendar distribution-shift warning,
 not a feature promotion or a schema defect. The next bounded action is the
 fixed 98-round B0 outer reference before assessing any trajectory candidate.
 
+That B0 pilot then completed at 2007-09 from commit
+`d21ccba667840d88c20b7c0dc037f835996bb437`: the 56-feature current-regional
+`B0=C1/98` information set scored raw/weighted RMSE **0.523809/0.523795** on
+278,447 rows after training on 851,814 causal rows. It constructed and verified
+the 56-column Test schema without generating Test predictions. Its 549.23-second
+runtime was dominated by target-blind trajectory-map construction; fit time was
+32.80 seconds. The runner now records continuous peak RSS and minimum available
+memory for the remaining declared replays. This single development pilot neither
+promotes a recipe nor establishes a capacity effect versus the older C1/59 run.
+
 ## 2026-09-08 — bounded local-response experiment (Kaggle-only)
 
 Run `local_response_20260907T220239Z` completed from commit

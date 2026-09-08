@@ -9,6 +9,7 @@ from src.hydro_trajectory import (
     build_regional_trajectory_map,
 )
 from src.regional_context import HYDRO_COLUMNS, build_regional_context
+from scripts.run_hydrological_trajectory import MemoryTracker
 
 
 def _source() -> pd.DataFrame:
@@ -73,3 +74,16 @@ def test_attachment_is_keyed_and_regional_trends_use_only_regional_source_values
         row["regional5_SPEI_01_t_trail3_mean"],
         changed_map.loc["0.0_0.0_2020-03", "regional5_SPEI_01_t_trail3_mean"],
     )
+
+
+def test_memory_tracker_exposes_current_and_peak_or_a_clear_unavailable_note():
+    tracker = MemoryTracker(interval_seconds=0.01)
+    tracker.start()
+    snapshot = tracker.snapshot()
+    tracker.stop()
+    if "note" in snapshot:
+        assert "memory" in snapshot["note"]
+    else:
+        assert snapshot["rss_gib"] >= 0.0
+        assert snapshot["peak_rss_gib"] >= snapshot["rss_gib"]
+        assert snapshot["min_available_gib"] >= 0.0

@@ -11,6 +11,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 import numpy as np
@@ -66,6 +67,68 @@ def _memory() -> dict[str, object]:
         }
     except Exception as exc:
         return {"note": f"memory unavailable: {type(exc).__name__}: {exc}"}
+
+
+class MemoryTracker:
+    """Continuously retain peak resident memory without retaining samples."""
+
+    def __init__(self, interval_seconds: float = 0.25) -> None:
+        self.interval_seconds = interval_seconds
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._note: str | None = None
+        self._process = None
+        self._psutil = None
+        self._peak_rss_gib: float | None = None
+        self._min_available_gib: float | None = None
+        try:
+            import psutil
+            self._psutil = psutil
+            self._process = psutil.Process()
+        except Exception as exc:
+            self._note = f"memory unavailable: {type(exc).__name__}: {exc}"
+
+    def _sample(self) -> None:
+        if self._process is None or self._psutil is None:
+            return
+        try:
+            rss_gib = self._process.memory_info().rss / 1024**3
+            available_gib = self._psutil.virtual_memory().available / 1024**3
+            with self._lock:
+                self._peak_rss_gib = max(self._peak_rss_gib or 0.0, rss_gib)
+                self._min_available_gib = available_gib if self._min_available_gib is None else min(
+                    self._min_available_gib, available_gib
+                )
+        except Exception as exc:
+            self._note = f"memory sampling unavailable: {type(exc).__name__}: {exc}"
+
+    def _watch(self) -> None:
+        while not self._stop.wait(self.interval_seconds):
+            self._sample()
+
+    def start(self) -> None:
+        self._sample()
+        if self._process is not None:
+            self._thread = threading.Thread(target=self._watch, name="memory-tracker", daemon=True)
+            self._thread.start()
+
+    def snapshot(self) -> dict[str, object]:
+        self._sample()
+        if self._note is not None:
+            return {"note": self._note}
+        current = _memory()
+        with self._lock:
+            return {
+                **current,
+                "peak_rss_gib": self._peak_rss_gib,
+                "min_available_gib": self._min_available_gib,
+            }
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=self.interval_seconds * 2)
 
 
 def _fold(train: pd.DataFrame, template: pd.DataFrame, origin: str) -> tuple[SimulatedFold, str]:
@@ -157,9 +220,11 @@ def main() -> None:
     }
     _json(args.output_dir / "manifest.json", manifest)
     results: list[dict[str, object]] = []
+    memory_tracker = MemoryTracker()
+    memory_tracker.start()
     try:
         with (args.output_dir / "console.log").open("w", encoding="utf-8") as log:
-            _emit(log, {"phase": "start", "commit": head, "memory": _memory()})
+            _emit(log, {"phase": "start", "commit": head, "memory": memory_tracker.snapshot()})
             import lightgbm as lgb
 
             train_cols = ["sample_id", "time", "lat", "lon", "TWS_t", "target", "month_sin", "month_cos", *HYDRO_COLUMNS]
@@ -172,12 +237,12 @@ def main() -> None:
             labels = train[["sample_id", "target"]].copy()
             regional_source = train[["sample_id", "time", "lat", "lon", *HYDRO_COLUMNS]].copy()
 
-            _emit(log, {"phase": "build_causal_trajectory_maps", "rows": int(len(source)), "memory": _memory()})
+            _emit(log, {"phase": "build_causal_trajectory_maps", "rows": int(len(source)), "memory": memory_tracker.snapshot()})
             regional = build_regional_context(regional_source)
             local_trajectory = build_hydro_trajectory_map(regional_source)
             regional_trajectory = build_regional_trajectory_map(regional_source, regional, local_trajectory)
             _emit(log, {"phase": "trajectory_maps_ready", "local_features": int(local_trajectory.shape[1] - 1),
-                        "regional_features": int(regional_trajectory.shape[1] - 1), "memory": _memory()})
+                        "regional_features": int(regional_trajectory.shape[1] - 1), "memory": memory_tracker.snapshot()})
 
             # Structural Test parity only: construct every feature schema but never fit/predict Test rows.
             test_ledger = test[["ID", "time", "lat", "lon", "TWS_t", "TWS_t_masked"]].copy()
@@ -218,7 +283,8 @@ def main() -> None:
                 label_hash = hashlib.sha256(np.ascontiguousarray(y_train).tobytes()).hexdigest()
                 _emit(log, {"phase": "origin_features_ready", "origin": origin, "role": role, "training_rows": int(len(rows)),
                             "validation_rows": int(len(fold.ledger)), "row_hash": row_hash, "coverage_hash": coverage_hash,
-                            "h_counts": {str(k): int(v) for k, v in fold.ledger.h.value_counts().sort_index().items()}, "memory": _memory()})
+                            "h_counts": {str(k): int(v) for k, v in fold.ledger.h.value_counts().sort_index().items()},
+                            "memory": memory_tracker.snapshot()})
                 for candidate in args.candidates:
                     fit_started = time.perf_counter()
                     x_train, x_valid = matrices_train[candidate], matrices_valid[candidate]
@@ -246,7 +312,7 @@ def main() -> None:
                     _json(args.output_dir / "metrics.partial.json", {"results": results})
                     _emit(log, {"phase": "fit_complete", "origin": origin, "candidate": candidate,
                                 "raw_rmse": score["raw_rmse"], "weighted_rmse": score["weighted_rmse"],
-                                "elapsed_seconds": score["elapsed_seconds"], "memory": _memory()})
+                                "elapsed_seconds": score["elapsed_seconds"], "memory": memory_tracker.snapshot()})
                     model.free_dataset()
                 del matrices_train, matrices_valid
 
@@ -268,6 +334,7 @@ def main() -> None:
                                                        "test_contract": test_contract})
             manifest.update({"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
                              "elapsed_seconds": time.perf_counter() - started, "result_rows": len(results),
+                             "memory_peak": memory_tracker.snapshot(),
                              "output_checksums": {str(p.relative_to(args.output_dir)): _sha256(p)
                                                   for p in args.output_dir.rglob("*") if p.is_file() and p.name != "manifest.json"}})
             _json(args.output_dir / "manifest.json", manifest)
@@ -277,9 +344,12 @@ def main() -> None:
             _emit(log, {"status": "completed", "output_dir": str(args.output_dir), "package": package, "results": len(results)})
     except Exception as exc:
         manifest.update({"status": "failed", "failed_at": datetime.now(timezone.utc).isoformat(),
-                         "elapsed_seconds": time.perf_counter() - started, "error": f"{type(exc).__name__}: {exc}"})
+                         "elapsed_seconds": time.perf_counter() - started, "error": f"{type(exc).__name__}: {exc}",
+                         "memory_peak": memory_tracker.snapshot()})
         _json(args.output_dir / "manifest.json", manifest)
         raise
+    finally:
+        memory_tracker.stop()
 
 
 if __name__ == "__main__":

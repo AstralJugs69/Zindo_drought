@@ -15,10 +15,18 @@
   (SHA-256 `7f20174f4894a45c8ee1afd856f43efd6b6b08a24616a1c66e3c25a8d65d2788`);
   its checksum-matched local Git-ignored copy is
   `artifacts/history_availability_audit_20260908T055537Z.zip`.
-- **Next single run:** establish the missing outer C1/98-capacity reference as
-  B0 at one origin before any B1/B2/B3 candidate. It produces OOF diagnostics,
-  feature-schema parity checks, and model artifacts only—never Test predictions
-  or a submission.
+- B0 pilot `hydro_trajectory_b0_pilot_20260908T060339Z` then completed from
+  `d21ccba667840d88c20b7c0dc037f835996bb437`: 56-feature `B0=C1/98` scored
+  raw/weighted RMSE 0.523809/0.523795 at 2007-09 (851,814 / 278,447 training /
+  validation rows). Its 8,126,728-byte remote archive and local ignored copy
+  both hash to `c23a3d8229825bc0d50ead0c8c6b3558b3cfb6c60b16d04ab5907a91c6f62c4a`.
+  Test schema parity passed; no Test prediction was produced. Map construction
+  succeeded, but its phase-only memory snapshots motivated the now-tested
+  continuous peak-memory tracker.
+- **Next single run:** fixed 98-round B0 at the three remaining declared
+  origins, then inspect all B0 metrics before running any B1/B2/B3 candidate.
+  It produces OOF diagnostics, feature-schema parity checks, and model artifacts
+  only—never Test predictions or a submission.
 
   ```bash
   cd /kaggle/working/Zindo_drought
@@ -27,14 +35,13 @@
 
   python -u scripts/run_hydrological_trajectory.py \
     --data-dir /kaggle/input/datasets/cashgenenator/drought \
-    --output-dir /kaggle/working/drought_runs/hydro_trajectory_b0_pilot_<UTC> \
+    --output-dir /kaggle/working/drought_runs/hydro_trajectory_b0_remaining_<UTC> \
     --expected-commit "$expected_commit" \
-    --origins 2007-09 --candidates B0 --rounds 98
+    --origins 2009-01 2014-04 2014-12 --candidates B0 --rounds 98
   ```
 
-- Inspect source-map construction, elapsed time, peak memory, Test feature
-  contract, OOF/model count, manifest and log. If the pilot finishes cleanly,
-  run fixed 98-round B0 across the remaining declared origins before evaluating
+- Inspect source-map construction, elapsed time, continuous peak memory, Test
+  feature contract, OOF/model count, manifest and log before evaluating
   B1/B2/B3. Do not reinterpret the inherited C1/59 metrics as C1/98 metrics.
 
 # Next action — local-response stress result

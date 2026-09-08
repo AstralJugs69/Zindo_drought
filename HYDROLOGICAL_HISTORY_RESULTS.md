@@ -62,6 +62,37 @@ The remote artifact bundle is
 identical, Git-ignored local durable copy is
 `artifacts/history_availability_audit_20260908T055537Z.zip`.
 
+## Stage B0 — fixed 98-round C1 reference pilot
+
+Kaggle run `hydro_trajectory_b0_pilot_20260908T060339Z` completed from clean
+commit `d21ccba667840d88c20b7c0dc037f835996bb437` in **549.23 s**. It is the
+plan's `B0 = C1/98` current-regional information set: 56 base/current-regional
+features, no local or regional trajectory block. The Test schema has the same
+56 names and is finite-or-missing; the runner constructed that contract but made
+no Test prediction.
+
+| Origin | Candidate | Training / validation rows | Raw RMSE | Weighted RMSE |
+|---|---|---:|---:|---:|
+| 2007-09 | B0 = C1/98 | 851,814 / 278,447 | **0.523809** | 0.523795 |
+
+All horizons 1--7 are represented. The fit took 32.80 s after preprocessing.
+The run recorded 110 local and 280 regional trajectory-map features during the
+structural pilot, even though B0 did not consume them. The phase snapshots show
+5.715 GiB RSS when those maps were ready and 6.189 GiB after fitting; a live
+monitor observed a temporary approximately 12.7 GiB RSS during construction.
+This pilot commit did not persist a true peak, so a continuous peak-RSS/minimum-
+available-memory tracker has been added before the next run. Do not infer a
+capacity gain from comparison with the inherited C1/59 artifact: it is a
+separately persisted run with different sampled-row provenance. This is the
+first actual outer C1/98 score, not independent confirmation.
+
+The remote archive is
+`/kaggle/working/drought_runs/hydro_trajectory_b0_pilot_20260908T060339Z.zip`
+(8,126,728 bytes, SHA-256
+`c23a3d8229825bc0d50ead0c8c6b3558b3cfb6c60b16d04ab5907a91c6f62c4a`). The
+checksum-matched, Git-ignored local copy is
+`artifacts/hydro_trajectory_b0_pilot_20260908T060339Z.zip`.
+
 ## Implemented, not yet measured
 
 - `scripts/run_history_availability_audit.py` produced the Stage A target-blind
@@ -88,7 +119,7 @@ evidence.
 | Did Stage A reveal a feature-contract defect? | No: all 56 B0 features are available in Test; material temporal distribution shift remains. |
 | Do local trajectories help B0? | Not yet measured. |
 | Do regional trajectories add beyond contemporaneous C1? | Not yet measured. |
-| Does C1/98 transfer to outer replays? | Not yet measured. |
+| Does C1/98 transfer to outer replays? | Measured at 2007-09 only (B0 raw RMSE 0.523809); three declared outer replays remain. |
 | Does a sequence model add beyond equivalent history inputs? | Not started; correctly gated behind Stage B. |
 | Is any new candidate independently confirmed? | No. |
 
