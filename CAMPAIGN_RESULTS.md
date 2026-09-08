@@ -9,11 +9,11 @@ added only after fresh Kaggle evidence is inspected.
 |---|---|---|
 | Corrected Phase A accounting | measured | Kaggle run `spatial_phase_a_repaired_20260908T013000Z`; commit `0f406fa...`; corrected values and retraction in `NEXT_ACTION.md` |
 | Spatial B1 ranks 8/16 | measured-negative | Kaggle run completed; all origins regressed; per-rank OOF persisted |
-| Spatial B2 ranks 8/16 | failed-runtime | First run reset Kaggle session; retry is currently blocked at session startup |
+| Spatial B2 ranks 8/16 | blocked-infrastructure | First run reset Kaggle session; three safe retries now blocked at previous-session upload/startup |
 | Regional 5/15-degree paired features | measured-partial | Both widths completed at frozen-173 with per-fit OOF/model files; inner capacity selection and transfer checks pending |
-| Inner capacity selection | pending | Chronological inner checks not yet run |
-| Additional recent/transfer block | pending | Coverage must be established before scoring |
-| Matched-data masking retest | pending | Not yet implemented |
+| Inner capacity selection | blocked-infrastructure | Chronological inner checks require Kaggle fitting; kernel unavailable |
+| Additional recent/transfer block | blocked-infrastructure | Coverage/scoring requires Kaggle kernel; not fabricated |
+| Matched-data masking retest | blocked-infrastructure | Requires Kaggle fitting; no local substitute used |
 | Downloaded artifacts | partial | Earlier local-response archive is durable locally; newer and campaign artifacts remain session-local until verified |
 
 No Test predictions, submission files, or Zindi submissions are permitted in
@@ -64,9 +64,11 @@ separate infrastructure-state blocker; no claim is made about B2 predictive
 performance.
 
 A later safe restart reached `Draft Session Waiting for previous session to
- upload results` and remained there across repeated checks. The notebook is not
- being force-stopped or replaced; the next action is to retry only after Kaggle
- reports a runnable kernel.
+upload results` and remained there across repeated checks. Three consecutive
+continuations observed the same unavailable-kernel state, so the campaign is
+genuinely blocked on Kaggle infrastructure. The notebook was not force-stopped
+or replaced. No B2, inner-capacity, transfer-block, or matched-mask score is
+claimed without a runnable kernel.
 
 ## Executed evidence
 
