@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.metrics import raw_rmse, score_by_horizon
+from src.metrics import TEST_H_WEIGHTS, raw_rmse, score_by_horizon
 
 
 INNER = ("2003-04", "2004-04")
@@ -74,9 +74,23 @@ def _metric(frame: pd.DataFrame) -> dict[str, object]:
     if present == list(range(1, 8)):
         weighted, table = score_by_horizon(supported.target, supported.prediction, supported.h)
         by_h = table.reset_index().to_dict(orient="records")
+    present_weighted = None
+    if len(supported):
+        # This is a diagnostic for calendar blocks with absent horizons.  It
+        # renormalizes the fixed Test horizon shares over only the horizons
+        # that actually exist; it is never treated as the official score.
+        weighted_mse = 0.0
+        observed_weight = 0.0
+        for horizon, group in supported.groupby("h", sort=True):
+            h = int(horizon)
+            weight = float(TEST_H_WEIGHTS[h])
+            weighted_mse += weight * float(np.mean(np.square(group.prediction - group.target)))
+            observed_weight += weight
+        present_weighted = float(np.sqrt(weighted_mse / observed_weight))
     tail = frame.loc[~frame.h.between(1, 7)]
     return {"raw_rmse": raw_rmse(frame.target, frame.prediction), "official_h1_7_weighted_rmse": weighted,
-            "official_horizons_present": present, "by_h": by_h,
+            "official_horizons_present": present, "present_h1_7_weighted_rmse": present_weighted,
+            "present_horizon_weight_total": float(sum(TEST_H_WEIGHTS[h] for h in present)), "by_h": by_h,
             "stress_h_gt7_rows": int(len(tail)), "stress_h_gt7_raw_rmse": None if tail.empty else raw_rmse(tail.target, tail.prediction)}
 
 
@@ -105,15 +119,35 @@ def _outer(frame: pd.DataFrame, selected: str | None) -> dict[str, object] | Non
         base_metric = _metric(base.rename(columns={"prediction": "prediction"}))
         candidate_frame = base.copy(); candidate_frame["prediction"] = np.mean(predictions, axis=0)
         candidate_metric = _metric(candidate_frame)
-        delta = None if base_metric["official_h1_7_weighted_rmse"] is None else float(candidate_metric["official_h1_7_weighted_rmse"] - base_metric["official_h1_7_weighted_rmse"])
-        output.append({"origin": origin, "D0": base_metric, selected: candidate_metric, "candidate_minus_D0_official_weighted": delta})
+        delta = None
+        if base_metric["official_h1_7_weighted_rmse"] is not None and candidate_metric["official_h1_7_weighted_rmse"] is not None:
+            delta = float(candidate_metric["official_h1_7_weighted_rmse"] - base_metric["official_h1_7_weighted_rmse"])
+        present_delta = None
+        if (
+            base_metric["present_h1_7_weighted_rmse"] is not None
+            and candidate_metric["present_h1_7_weighted_rmse"] is not None
+            and base_metric["official_horizons_present"] == candidate_metric["official_horizons_present"]
+        ):
+            present_delta = float(candidate_metric["present_h1_7_weighted_rmse"] - base_metric["present_h1_7_weighted_rmse"])
+        output.append({"origin": origin, "D0": base_metric, selected: candidate_metric,
+                       "candidate_minus_D0_official_weighted": delta,
+                       "candidate_minus_D0_present_horizon_weighted": present_delta})
     deltas = [item["candidate_minus_D0_official_weighted"] for item in output]
-    if any(value is None for value in deltas):
-        raise AssertionError("outer origin lacks a complete official h1-7 score")
+    present_deltas = [item["candidate_minus_D0_present_horizon_weighted"] for item in output]
+    official_complete = not any(value is None for value in deltas)
     recent = [item for item in output if item["origin"] in {"2014-04", "2014-12"}]
-    promote = bool(float(np.mean(deltas)) < 0 and all(item["candidate_minus_D0_official_weighted"] <= 0 for item in recent) and all(value <= .003 for value in deltas))
-    return {"selected_recipe": selected, "by_origin": output, "equal_origin_mean_candidate_minus_D0_official_weighted": float(np.mean(deltas)),
-            "promote": promote, "rule": "Promote only if mean official metric improves, neither recent origin regresses, and no origin deteriorates by more than 0.003 weighted RMSE."}
+    promote = False
+    if official_complete:
+        promote = bool(float(np.mean(deltas)) < 0 and all(item["candidate_minus_D0_official_weighted"] <= 0 for item in recent) and all(value <= .003 for value in deltas))
+    return {
+        "selected_recipe": selected, "by_origin": output,
+        "official_gate_complete": official_complete,
+        "equal_origin_mean_candidate_minus_D0_official_weighted": None if not official_complete else float(np.mean(deltas)),
+        "equal_origin_mean_candidate_minus_D0_present_horizon_weighted": None if any(value is None for value in present_deltas) else float(np.mean(present_deltas)),
+        "promotion_blockers": [item["origin"] for item in output if item["candidate_minus_D0_official_weighted"] is None],
+        "promote": promote,
+        "rule": "Promote only if the complete official h1-7 metric improves on average, neither recent origin regresses, and no origin deteriorates by more than 0.003 weighted RMSE. Present-horizon scores are diagnostics only and cannot satisfy this gate.",
+    }
 
 
 def analyze(run_dirs: list[Path]) -> dict[str, object]:

@@ -99,6 +99,11 @@ def main() -> None:
     parser.add_argument("--origin", choices=ALL_ORIGINS, required=True)
     parser.add_argument("--recipe", choices=RECIPES, required=True)
     parser.add_argument("--augmentation-seed", type=int, choices=SEEDS)
+    parser.add_argument(
+        "--include-stress-tail",
+        action="store_true",
+        help="retain h>7 rows in the December-2014 stress fold for separate diagnostics",
+    )
     args = parser.parse_args()
     if args.recipe == "D0_dense" and args.augmentation_seed is not None:
         raise ValueError("D0_dense has no augmentation seed")
@@ -114,6 +119,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True)
     manifest: dict[str, object] = {"status": "running", "commit": head, "origin": args.origin, "recipe": args.recipe,
         "augmentation_seed": args.augmentation_seed, "rounds": ROUNDS, "no_test_predictions": True,
+        "include_stress_tail": bool(args.include_stress_tail),
         "started_at": datetime.now(timezone.utc).isoformat(), "platform": platform.platform()}
     _json(args.output_dir / "manifest.json", manifest)
     started = time.perf_counter()
@@ -128,7 +134,7 @@ def main() -> None:
         structural = train[["sample_id", "time", "lat", "lon", "TWS_t"]].copy()
         source = train.loc[:, SOURCE_HYDRO_HISTORY_COLUMNS].copy()
         labels = train[["sample_id", "target"]].copy()
-        fold, role = _fold(train, template, args.origin)
+        fold, role = _fold(train, template, args.origin, include_stress_tail=args.include_stress_tail)
         view = build_replay_observation_view(source, structural, ledger=fold.ledger, first_source_month=fold.spec.first_source_month, last_source_month=fold.spec.last_source_month)
         rows = build_sampled_training_rows(view.structural, view.source.loc[:, SOURCE_CORE_COLUMNS], max_target_month=pd.Period(args.origin, freq="M") - 1, seed=20260908).rows
         y_train = _attach_delta(rows, labels).astype(np.float32)
@@ -150,6 +156,7 @@ def main() -> None:
         model.save_model(str(args.output_dir / "model.txt")); oof.to_csv(args.output_dir / "oof.csv.gz", index=False, compression="gzip")
         manifest.update({"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(), "elapsed_seconds": time.perf_counter() - started,
             "role": role, "augmentation": augmentation, "training_rows": int(len(rows)), "validation_rows": int(len(fold.ledger)),
+            "include_stress_tail": bool(args.include_stress_tail),
             "training_ids_hash": _hash_values(rows.sample_id), "training_labels_hash": _hash_values(y_train), "training_weights_hash": _hash_values(weights),
             "validation_ids_hash": _hash_values(fold.ledger.sample_id), "feature_names": train_x.columns.tolist(), "feature_count": int(train_x.shape[1]), "metrics": metrics,
             "checksums": {"model.txt": _sha256(args.output_dir / "model.txt"), "oof.csv.gz": _sha256(args.output_dir / "oof.csv.gz")}})

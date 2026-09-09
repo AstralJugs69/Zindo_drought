@@ -133,7 +133,21 @@ class MemoryTracker:
             self._thread.join(timeout=self.interval_seconds * 2)
 
 
-def _fold(train: pd.DataFrame, template: pd.DataFrame, origin: str) -> tuple[SimulatedFold, str]:
+def _fold(
+    train: pd.DataFrame,
+    template: pd.DataFrame,
+    origin: str,
+    *,
+    include_stress_tail: bool = False,
+) -> tuple[SimulatedFold, str]:
+    """Build the declared replay fold.
+
+    The default preserves the historical competition-horizon slice for the
+    December-2014 stress block.  Gap-augmentation diagnostics may opt into the
+    complete block so that h>7 rows remain available as a separately reported
+    stress tail; this never changes the fitting cutoff or the official h=1..7
+    score.
+    """
     if origin in INNER_ORIGINS:
         return build_template_replay_fold(
             train, template, start_month=origin,
@@ -149,6 +163,8 @@ def _fold(train: pd.DataFrame, template: pd.DataFrame, origin: str) -> tuple[Sim
             train, anchor_month=origin, end_month="2015-06",
             scenario_id="trajectory_recent_2014_12", family="recent_mask_block",
         )
+        if include_stress_tail:
+            return full, "recent_development"
         keep = full.ledger.h.between(1, 7).to_numpy()
         return SimulatedFold(
             full.spec,
