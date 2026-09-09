@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_lgbm_core import DEFAULT_PARAMS
+from src.availability import build_replay_observation_view
 from src.ml_features import (
     SOURCE_CORE_COLUMNS,
     SOURCE_HYDRO_HISTORY_COLUMNS,
@@ -38,7 +39,6 @@ from src.ml_features import (
 from src.neural_sequence import build_b3_feature_maps, build_b3_matrix
 from src.observation_simulator import (
     ScenarioSpec,
-    build_replay_observation_view,
     build_template_replay_fold,
     simulate_observations,
 )
