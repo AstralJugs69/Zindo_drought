@@ -37,6 +37,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.ml_features import (
+    HYDRO_GAP_SAFE_FEATURE_COLUMNS,
     SOURCE_CORE_COLUMNS,
     SOURCE_HYDRO_HISTORY_COLUMNS,
     build_sampled_training_rows,
@@ -44,6 +45,8 @@ from src.ml_features import (
 )
 from src.metrics import TEST_H_WEIGHTS
 from src.neural_sequence import build_b3_feature_maps, build_b3_matrix
+from src.availability import build_replay_observation_view
+from src.observation_simulator import build_mask_block_fold
 from src.regional_context import HYDRO_COLUMNS
 from scripts.run_b3_full_submission import (
     _attach_delta,
@@ -589,7 +592,13 @@ def _array_hash(values: np.ndarray) -> str:
 
 
 def _aggregate_error_frame(frame: pd.DataFrame, group_columns: list[str], *, error_col: str = "error", persistence_error_col: str = "persistence_error") -> pd.DataFrame:
-    """Aggregate errors without retaining row-level predictions on disk."""
+    """Aggregate errors into additive sufficient statistics.
+
+    Means are deliberately not emitted here.  A later grouping may combine
+    batches or cells with unequal row counts, so carrying a batch mean and then
+    summing it would apply the wrong denominator.  ``_finalize_error_metrics``
+    is the only place that derives RMSE, MAE, bias, and centered spread.
+    """
     rows: list[dict[str, Any]] = []
     for key, group in frame.groupby(group_columns, sort=True, dropna=False):
         if not isinstance(key, tuple):
@@ -600,18 +609,234 @@ def _aggregate_error_frame(frame: pd.DataFrame, group_columns: list[str], *, err
         values.update({
             "rows": int(len(group)),
             "b3_sse": float(np.sum(np.square(error))),
-            "b3_rmse": float(np.sqrt(np.mean(np.square(error)))),
-            "b3_mae": float(np.mean(np.abs(error))),
-            "b3_bias": float(np.mean(error)),
-            "b3_centered_std": float(np.std(error)),
+            "b3_abs_error_sum": float(np.sum(np.abs(error))),
+            "b3_error_sum": float(np.sum(error)),
             "persistence_sse": float(np.sum(np.square(persistence))),
-            "persistence_rmse": float(np.sqrt(np.mean(np.square(persistence)))),
-            "persistence_bias": float(np.mean(persistence)),
-            "b3_minus_persistence_rmse": float(np.sqrt(np.mean(np.square(error))) - np.sqrt(np.mean(np.square(persistence)))),
+            "persistence_abs_error_sum": float(np.sum(np.abs(persistence))),
+            "persistence_error_sum": float(np.sum(persistence)),
         })
-        values["rmse2_minus_bias2_minus_centered_var"] = float(np.mean(np.square(error)) - (np.mean(error) ** 2 + np.var(error - np.mean(error))))
         rows.append(values)
     return pd.DataFrame(rows)
+
+
+def _finalize_error_metrics(frame: pd.DataFrame) -> pd.DataFrame:
+    """Derive row-normalized metrics from additive error statistics."""
+    out = frame.copy()
+    if out.empty:
+        return out
+    rows = out["rows"].to_numpy(dtype=np.float64)
+    if np.any(rows <= 0):
+        raise AssertionError("error aggregates must have positive row counts")
+    b3_mse = out["b3_sse"].to_numpy(dtype=np.float64) / rows
+    persistence_mse = out["persistence_sse"].to_numpy(dtype=np.float64) / rows
+    b3_bias = out["b3_error_sum"].to_numpy(dtype=np.float64) / rows
+    persistence_bias = out["persistence_error_sum"].to_numpy(dtype=np.float64) / rows
+    out["b3_rmse"] = np.sqrt(np.maximum(b3_mse, 0.0))
+    out["b3_mae"] = out["b3_abs_error_sum"].to_numpy(dtype=np.float64) / rows
+    out["b3_bias"] = b3_bias
+    out["b3_centered_std"] = np.sqrt(np.maximum(b3_mse - np.square(b3_bias), 0.0))
+    out["persistence_rmse"] = np.sqrt(np.maximum(persistence_mse, 0.0))
+    out["persistence_mae"] = out["persistence_abs_error_sum"].to_numpy(dtype=np.float64) / rows
+    out["persistence_bias"] = persistence_bias
+    out["persistence_centered_std"] = np.sqrt(np.maximum(persistence_mse - np.square(persistence_bias), 0.0))
+    out["b3_minus_persistence_rmse"] = out["b3_rmse"] - out["persistence_rmse"]
+    out["b3_minus_persistence_sse"] = out["b3_sse"] - out["persistence_sse"]
+    out["rmse2_minus_bias2_minus_centered_var"] = b3_mse - (
+        np.square(b3_bias) + np.square(out["b3_centered_std"].to_numpy(dtype=np.float64))
+    )
+    return out
+
+
+def _tag_training_exposure(
+    replay: pd.DataFrame,
+    training_events: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Tag replay rows by exact ``(sample_id, anchor date, h)`` exposure.
+
+    A source ID occurring in the full-training sample is not sufficient to call
+    a replay row in-sample: deterministic horizon sampling can assign a
+    different anchor task to that same source event.  The anchor date and
+    horizon are therefore part of the join identity.
+    """
+    required_replay = {"sample_id", "last_observed_date", "h"}
+    required_training = {"sample_id", "last_observed_date", "h"}
+    if missing := required_replay.difference(replay.columns):
+        raise ValueError(f"replay missing exposure columns: {sorted(missing)}")
+    if missing := required_training.difference(training_events.columns):
+        raise ValueError(f"training events missing exposure columns: {sorted(missing)}")
+    left = replay.copy()
+    right = training_events.loc[:, ["sample_id", "last_observed_date", "h"]].copy()
+    left["sample_id"] = left["sample_id"].astype(str)
+    right["sample_id"] = right["sample_id"].astype(str)
+    left["_anchor_key"] = pd.to_datetime(left["last_observed_date"]).dt.strftime("%Y-%m-%d")
+    right["_anchor_key"] = pd.to_datetime(right["last_observed_date"]).dt.strftime("%Y-%m-%d")
+    left["h"] = left["h"].astype(int)
+    right["h"] = right["h"].astype(int)
+    key = ["sample_id", "_anchor_key", "h"]
+    if right.duplicated(key).any():
+        raise AssertionError("full training exposure keys are not unique")
+    source_ids = set(right["sample_id"])
+    tagged = left.merge(
+        right.loc[:, key].assign(_exact_training_exposure=True),
+        on=key,
+        how="left",
+        validate="one_to_one",
+        sort=False,
+    )
+    tagged["source_id_in_full_training"] = tagged["sample_id"].isin(source_ids)
+    tagged["exact_training_exposure"] = tagged["_exact_training_exposure"].eq(True)
+    tagged["exposure_status"] = np.select(
+        [
+            tagged["exact_training_exposure"].to_numpy(dtype=bool),
+            tagged["source_id_in_full_training"].to_numpy(dtype=bool),
+        ],
+        ["exact_exposure", "different_anchor"],
+        default="source_id_not_in_full_training",
+    )
+    tagged = tagged.drop(columns=["_anchor_key", "_exact_training_exposure"])
+    counts = {
+        "replay_rows": int(len(tagged)),
+        "source_id_in_full_training_rows": int(tagged["source_id_in_full_training"].sum()),
+        "exact_exposure_rows": int(tagged["exact_training_exposure"].sum()),
+        "different_anchor_rows": int((tagged["exposure_status"] == "different_anchor").sum()),
+        "source_id_not_in_full_training_rows": int((tagged["exposure_status"] == "source_id_not_in_full_training").sum()),
+    }
+    if sum(counts[key] for key in ("exact_exposure_rows", "different_anchor_rows", "source_id_not_in_full_training_rows")) != counts["replay_rows"]:
+        raise AssertionError("exposure status counts do not partition replay rows")
+    return tagged, counts
+
+
+def _comparison_metric_row(
+    frame: pd.DataFrame,
+    *,
+    scope: str,
+    group_values: dict[str, Any],
+) -> dict[str, Any]:
+    """Return A/B/C/persistence metrics for one paired subset."""
+    row: dict[str, Any] = {"scope": scope, **group_values, "rows": int(len(frame))}
+    row["h1_7_rows"] = int(frame["h"].between(1, 7).sum())
+    row["h_gt7_rows"] = int((frame["h"] > 7).sum())
+    for label in ("a", "b", "c", "persistence"):
+        prediction = frame[f"{label}_prediction"].to_numpy(dtype=np.float64)
+        metrics = _metric_arrays(frame["target"].to_numpy(dtype=np.float64), prediction)
+        row[f"{label}_sse"] = float(metrics["mse"] * metrics["rows"]) if metrics["mse"] is not None else None
+        row[f"{label}_rmse"] = metrics["rmse"]
+        row[f"{label}_mae"] = metrics["mae"]
+        row[f"{label}_bias"] = metrics["bias"]
+        row[f"{label}_centered_std"] = metrics["centered_std"]
+        row[f"{label}_decomposition_error"] = metrics["decomposition_error"]
+        row[f"{label}_h1_7_weighted_rmse"] = _weighted_rmse(
+            frame.loc[frame["h"].between(1, 7)], f"{label}_prediction"
+        )
+    row["b_minus_a_rmse"] = None if row["b_rmse"] is None or row["a_rmse"] is None else float(row["b_rmse"] - row["a_rmse"])
+    row["c_minus_b_rmse"] = None if row["c_rmse"] is None or row["b_rmse"] is None else float(row["c_rmse"] - row["b_rmse"])
+    row["b_minus_a_sse"] = None if row["b_sse"] is None or row["a_sse"] is None else float(row["b_sse"] - row["a_sse"])
+    row["c_minus_b_sse"] = None if row["c_sse"] is None or row["b_sse"] is None else float(row["c_sse"] - row["b_sse"])
+    return row
+
+
+def _comparison_metric_table(
+    frame: pd.DataFrame,
+    group_columns: list[str],
+    scopes: dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for scope, subset in scopes.items():
+        if subset.empty:
+            continue
+        if group_columns:
+            grouped = subset.groupby(group_columns, sort=True, dropna=False)
+            groups: Iterable[tuple[tuple[Any, ...], pd.DataFrame]] = grouped
+        else:
+            groups = [((), subset)]
+        for key, group in groups:
+            if not isinstance(key, tuple):
+                key = (key,)
+            values = {column: value for column, value in zip(group_columns, key)}
+            rows.append(_comparison_metric_row(group, scope=scope, group_values=values))
+    return pd.DataFrame(rows)
+
+
+def _source_view_month_table(
+    sparse_source: pd.DataFrame,
+    dense_source: pd.DataFrame,
+    *,
+    first_source_month: str,
+    last_source_month: str,
+) -> pd.DataFrame:
+    """Summarize the source-row support used by sparse and dense feature views."""
+    first = pd.Period(first_source_month, freq="M")
+    last = pd.Period(last_source_month, freq="M")
+    months = pd.period_range(first, last, freq="M")
+
+    def summarize(source: pd.DataFrame, prefix: str) -> pd.DataFrame:
+        x = source.loc[:, ["time", "lat", "lon"]].copy()
+        x["source_month"] = pd.to_datetime(x["time"]).dt.to_period("M")
+        x["cell_lat5"] = np.floor(x["lat"].astype(float) / 5.0) * 5.0
+        x["cell_lon5"] = np.floor(x["lon"].astype(float) / 5.0) * 5.0
+        x["_location_key"] = x["lat"].astype(str) + "|" + x["lon"].astype(str)
+        x["_region5_key"] = x["cell_lat5"].astype(str) + "|" + x["cell_lon5"].astype(str)
+        grouped = x.groupby("source_month", sort=True).agg(
+            rows=("source_month", "size"),
+            locations=("_location_key", "nunique"),
+            region5_cells=("_region5_key", "nunique"),
+        )
+        grouped.index = pd.PeriodIndex(grouped.index, freq="M")
+        grouped = grouped.reindex(months, fill_value=0).reset_index().rename(columns={"index": "source_month"})
+        grouped["source_month"] = grouped["source_month"].astype(str)
+        return grouped.rename(columns={column: f"{prefix}_{column}" for column in ("rows", "locations", "region5_cells")})
+
+    sparse = summarize(sparse_source, "sparse")
+    dense = summarize(dense_source, "dense")
+    out = sparse.merge(dense, on="source_month", how="outer", validate="one_to_one", sort=True)
+    out["dense_minus_sparse_rows"] = out["dense_rows"] - out["sparse_rows"]
+    out["dense_minus_sparse_locations"] = out["dense_locations"] - out["sparse_locations"]
+    out["dense_minus_sparse_region5_cells"] = out["dense_region5_cells"] - out["sparse_region5_cells"]
+    return out
+
+
+def _cell_metric_table(frame: pd.DataFrame, scopes: dict[str, pd.DataFrame]) -> tuple[pd.DataFrame, pd.DataFrame, list[dict[str, Any]]]:
+    """Build all-cell and top-five-per-model SSE tables plus conservation checks."""
+    all_parts: list[pd.DataFrame] = []
+    checks: list[dict[str, Any]] = []
+    for scope, subset in scopes.items():
+        if subset.empty:
+            continue
+        grouped = subset.groupby(
+            ["source_month", "target_month", "cell_lat5", "cell_lon5"],
+            sort=True,
+            dropna=False,
+        )
+        rows: list[dict[str, Any]] = []
+        for key, group in grouped:
+            source_month, target_month, cell_lat5, cell_lon5 = key
+            row: dict[str, Any] = {
+                "scope": scope,
+                "source_month": source_month,
+                "target_month": target_month,
+                "cell_lat5": cell_lat5,
+                "cell_lon5": cell_lon5,
+                "rows": int(len(group)),
+            }
+            for label in ("a", "b", "c", "persistence"):
+                row[f"{label}_sse"] = float(np.sum(np.square(group[f"{label}_prediction"].to_numpy(dtype=np.float64) - group["target"].to_numpy(dtype=np.float64))))
+            rows.append(row)
+        cells = pd.DataFrame(rows)
+        for label in ("a", "b", "c", "persistence"):
+            cells[f"{label}_sse_rank"] = cells.groupby("source_month")[f"{label}_sse"].rank(method="first", ascending=False).astype(int)
+        all_parts.append(cells)
+        for (source_month, target_month), group in subset.groupby(["source_month", "target_month"], sort=True):
+            for label in ("a", "b", "c", "persistence"):
+                total = float(np.sum(np.square(group[f"{label}_prediction"].to_numpy(dtype=np.float64) - group["target"].to_numpy(dtype=np.float64))))
+                cell_total = float(cells.loc[cells["source_month"].eq(source_month) & cells["target_month"].eq(target_month), f"{label}_sse"].sum())
+                checks.append({"scope": scope, "source_month": source_month, "target_month": target_month, "model": label, "row_sse": total, "cell_sse": cell_total, "abs_difference": abs(total - cell_total), "ok": bool(np.isclose(total, cell_total, atol=1e-8, rtol=1e-12))})
+    all_cells = pd.concat(all_parts, ignore_index=True) if all_parts else pd.DataFrame()
+    if all_cells.empty:
+        return all_cells, all_cells, checks
+    rank_columns = [f"{label}_sse_rank" for label in ("a", "b", "c", "persistence")]
+    top = all_cells.loc[all_cells[rank_columns].min(axis=1) <= 5].copy()
+    top = top.sort_values(["scope", "source_month", "a_sse_rank", "b_sse_rank", "c_sse_rank"], kind="mergesort")
+    return all_cells, top, checks
 
 
 def _tree_gain_groups(booster: Any, feature_names: list[str] | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -741,25 +966,23 @@ def stage_full_fit(args: argparse.Namespace) -> None:
             del x, part, pred_delta, truth_delta, error, persistence_error
             if start_index // int(args.batch_size) % 10 == 0:
                 print(json.dumps({"stage": "full_fit", "rows_scored": stop_index, "total_rows": len(rows), "memory": _memory()}, sort_keys=True), flush=True)
-        aggregates = pd.concat(aggregate_parts, ignore_index=True).groupby(["source_month", "source_year", "h", "geo5"], as_index=False, sort=True)[["rows", "b3_sse", "b3_mae", "b3_bias", "persistence_sse"]].sum()
-        aggregates["b3_rmse"] = np.sqrt(aggregates["b3_sse"] / aggregates["rows"])
-        aggregates["persistence_rmse"] = np.sqrt(aggregates["persistence_sse"] / aggregates["rows"])
-        aggregates["b3_minus_persistence_rmse"] = aggregates["b3_rmse"] - aggregates["persistence_rmse"]
-        aggregates["b3_bias"] = aggregates["b3_bias"] / aggregates["rows"]
-        aggregates["b3_mae"] = aggregates["b3_mae"] / aggregates["rows"]
-        source_table = aggregates.groupby(["source_month", "source_year", "h"], as_index=False, sort=True)[["rows", "b3_sse", "b3_mae", "b3_bias", "persistence_sse"]].sum()
-        source_table["b3_rmse"] = np.sqrt(source_table["b3_sse"] / source_table["rows"])
-        source_table["persistence_rmse"] = np.sqrt(source_table["persistence_sse"] / source_table["rows"])
-        source_table["b3_minus_persistence_rmse"] = source_table["b3_rmse"] - source_table["persistence_rmse"]
-        source_table["b3_bias"] = source_table["b3_bias"] / source_table["rows"]
-        source_table["b3_mae"] = source_table["b3_mae"] / source_table["rows"]
+        additive_columns = [
+            "rows", "b3_sse", "b3_abs_error_sum", "b3_error_sum",
+            "persistence_sse", "persistence_abs_error_sum", "persistence_error_sum",
+        ]
+        aggregates = pd.concat(aggregate_parts, ignore_index=True).groupby(
+            ["source_month", "source_year", "h", "geo5"], as_index=False, sort=True
+        )[additive_columns].sum()
+        aggregates = _finalize_error_metrics(aggregates)
+        source_table = aggregates.groupby(
+            ["source_month", "source_year", "h"], as_index=False, sort=True
+        )[additive_columns].sum()
+        source_table = _finalize_error_metrics(source_table)
         source_table.to_csv(args.run_dir / "fit_by_source_month.csv", index=False)
-        geo_table = aggregates.groupby(["geo5", "h"], as_index=False, sort=True)[["rows", "b3_sse", "b3_mae", "b3_bias", "persistence_sse"]].sum()
-        geo_table["b3_rmse"] = np.sqrt(geo_table["b3_sse"] / geo_table["rows"])
-        geo_table["persistence_rmse"] = np.sqrt(geo_table["persistence_sse"] / geo_table["rows"])
-        geo_table["b3_minus_persistence_rmse"] = geo_table["b3_rmse"] - geo_table["persistence_rmse"]
-        geo_table["b3_bias"] = geo_table["b3_bias"] / geo_table["rows"]
-        geo_table["b3_mae"] = geo_table["b3_mae"] / geo_table["rows"]
+        geo_table = aggregates.groupby(
+            ["geo5", "h"], as_index=False, sort=True
+        )[additive_columns].sum()
+        geo_table = _finalize_error_metrics(geo_table)
         geo_table.to_csv(args.run_dir / "fit_by_geo5.csv", index=False)
         late_geo = aggregates.loc[aggregates["source_year"].eq(2015)].copy()
         late_geo.to_csv(args.run_dir / "fit_late_2015_by_geo5.csv", index=False)
@@ -806,6 +1029,369 @@ def stage_tree_inspection(args: argparse.Namespace) -> None:
         result = {"model_path": str(model_path), "model_sha256": _sha256(model_path), "feature_count": len(names), "tree_metadata": metadata, "tree_gain_csv": str(args.run_dir / "fit_tree_gain_groups.csv")}
         _json(args.run_dir / "tree_inspection_details.json", result)
         _stage_finish(path, manifest, started, details_path=str(args.run_dir / "tree_inspection_details.json"), trees=result)
+    except Exception as exc:
+        _stage_fail(path, manifest, started, exc)
+        raise
+
+
+def _find_d0_replay_package(oof_root: Path, origin: str) -> Path:
+    token = origin.replace("-", "_")
+    candidates = sorted(
+        path for path in oof_root.rglob(f"*_D0_{token}")
+        if path.is_dir() and (path / "model.txt").is_file() and (path / "oof.csv.gz").is_file()
+    )
+    if len(candidates) != 1:
+        raise FileNotFoundError(f"expected one D0 replay package for {origin}, found {candidates}")
+    return candidates[0]
+
+
+def _namespace_frame(frame: pd.DataFrame, prefix: str = "tr__") -> pd.DataFrame:
+    out = frame.copy()
+    if "sample_id" not in out.columns:
+        raise ValueError("frame must contain sample_id before namespacing")
+    out["sample_id"] = _namespace(prefix, out["sample_id"])
+    return out
+
+
+def _predict_saved_b3(
+    booster: Any,
+    ledger: pd.DataFrame,
+    source: pd.DataFrame,
+    structural: pd.DataFrame,
+    feature_names: list[str],
+) -> tuple[np.ndarray, pd.DataFrame]:
+    maps = build_b3_feature_maps(source)
+    features = build_b3_matrix(ledger, source, structural, maps)
+    if features.columns.tolist() != feature_names:
+        raise AssertionError("saved model feature schema differs from rebuilt replay features")
+    prediction = ledger["last_observed_TWS"].to_numpy(dtype=np.float64) + np.asarray(
+        booster.predict(features), dtype=np.float64
+    )
+    return prediction, features
+
+
+def stage_matched_comparison(args: argparse.Namespace) -> None:
+    """Compare historical D0 and full B3 under one exact replay ledger."""
+    path, manifest, started = _stage_start(args.run_dir, "matched_comparison", args.expected_commit)
+    try:
+        import lightgbm as lgb
+
+        origin = str(args.matched_origin)
+        if origin != "2014-12":
+            raise ValueError("matched_comparison currently requires --matched-origin 2014-12")
+        d0_dir = (
+            args.d0_model_dir.resolve()
+            if args.d0_model_dir is not None
+            else _find_d0_replay_package(args.oof_root.resolve(), origin)
+        )
+        d0_model_path = d0_dir / "model.txt"
+        d0_oof_path = args.d0_oof.resolve() if args.d0_oof is not None else d0_dir / "oof.csv.gz"
+        d0_manifest_path = d0_dir / "manifest.json"
+        for required in (d0_model_path, d0_oof_path, d0_manifest_path):
+            if not required.is_file():
+                raise FileNotFoundError(required)
+        d0_manifest = json.loads(d0_manifest_path.read_text(encoding="utf-8"))
+        full_dir = args.model_dir.resolve()
+        full_model_path = full_dir / "model.txt"
+        full_schema_path = full_dir / "feature_schema.json"
+        full_config_path = full_dir / "resolved_config.json"
+        for required in (full_model_path, full_schema_path, full_config_path):
+            if not required.is_file():
+                raise FileNotFoundError(required)
+
+        oof_columns = [
+            "sample_id", "source_date", "last_observed_date", "last_observed_TWS", "h",
+            "lat", "lon", "target", "prediction", "anchor_age_months",
+        ]
+        oof = pd.read_csv(d0_oof_path, usecols=oof_columns)
+        oof["sample_id"] = oof["sample_id"].astype(str)
+        if oof["sample_id"].duplicated().any():
+            raise AssertionError("D0 replay OOF IDs are not unique")
+        oof["h"] = oof["h"].astype(int)
+
+        train = _load_train(args.data_dir, hydro=True)
+        train["sample_id"] = train["sample_id"].astype(str)
+        train_plain_structural = train.loc[:, ["sample_id", "time", "lat", "lon", "TWS_t"]].copy()
+        train_plain_source = train.loc[:, SOURCE_HYDRO_HISTORY_COLUMNS].copy()
+        train_plain_source["sample_id"] = train_plain_source["sample_id"].astype(str)
+        train_plain_labels = train.loc[:, ["sample_id", "target"]].copy()
+        train_plain_labels["sample_id"] = train_plain_labels["sample_id"].astype(str)
+
+        full_fold = build_mask_block_fold(
+            train.loc[:, ["sample_id", "time", "lat", "lon", "TWS_t", "target"]],
+            anchor_month=origin,
+            end_month="2015-06",
+            scenario_id="matched_leaderboard_2014_12",
+            family="recent_mask_block",
+        )
+        full_ledger = full_fold.ledger.copy()
+        full_ledger["sample_id"] = full_ledger["sample_id"].astype(str)
+        if full_ledger["sample_id"].duplicated().any():
+            raise AssertionError("reconstructed replay ledger IDs are not unique")
+        missing_oof = sorted(set(oof["sample_id"]) - set(full_ledger["sample_id"]))
+        if missing_oof:
+            raise AssertionError(f"D0 OOF IDs absent from reconstructed legal ledger: {len(missing_oof)}")
+        # Preserve the saved OOF row order while taking every other field from the
+        # freshly reconstructed legal simulator ledger.
+        replay = full_ledger.set_index("sample_id").loc[oof["sample_id"].tolist()].reset_index()
+        if len(replay) != len(oof):
+            raise AssertionError("reconstructed replay row count differs from OOF")
+
+        identity = replay.loc[:, ["sample_id", "source_date", "last_observed_date", "last_observed_TWS", "h", "lat", "lon"]].merge(
+            oof.loc[:, ["sample_id", "source_date", "last_observed_date", "last_observed_TWS", "h", "lat", "lon", "target"]],
+            on="sample_id", how="outer", validate="one_to_one", sort=False, suffixes=("_replay", "_oof"),
+        )
+        if identity.isna().any(axis=None):
+            raise AssertionError("replay/OOF identity join has missing fields")
+        date_checks: dict[str, Any] = {}
+        for column in ("source_date", "last_observed_date"):
+            left = pd.to_datetime(identity[f"{column}_replay"]).dt.strftime("%Y-%m-%d")
+            right = pd.to_datetime(identity[f"{column}_oof"]).dt.strftime("%Y-%m-%d")
+            date_checks[column] = {"equal": bool(np.array_equal(left.to_numpy(), right.to_numpy())), "mismatched_rows": int((left != right).sum())}
+        for column in ("h", "lat", "lon"):
+            left = identity[f"{column}_replay"].to_numpy(dtype=np.float64)
+            right = identity[f"{column}_oof"].to_numpy(dtype=np.float64)
+            date_checks[column] = {"equal": bool(np.array_equal(left, right)), "max_abs_difference": float(np.max(np.abs(left - right)))}
+        anchor_diff = identity["last_observed_TWS_replay"].to_numpy(dtype=np.float64) - identity["last_observed_TWS_oof"].to_numpy(dtype=np.float64)
+        target_lookup = train_plain_labels.set_index("sample_id")["target"]
+        train_target = target_lookup.loc[oof["sample_id"]].to_numpy(dtype=np.float64)
+        target_diff = train_target - oof["target"].to_numpy(dtype=np.float64)
+        identity_checks = {
+            "rows": int(len(identity)),
+            "oof_ids_equal_reconstructed_ledger_subset": bool(set(oof["sample_id"]) == set(replay["sample_id"])),
+            "date_and_scalar_checks": date_checks,
+            "anchor_value_max_abs_difference": float(np.max(np.abs(anchor_diff))) if len(anchor_diff) else 0.0,
+            "target_train_vs_oof_max_abs_difference": float(np.max(np.abs(target_diff))) if len(target_diff) else 0.0,
+        }
+        if any(not value["equal"] for value in date_checks.values() if "equal" in value) or identity_checks["anchor_value_max_abs_difference"] > 1e-6 or identity_checks["target_train_vs_oof_max_abs_difference"] > 1e-6:
+            raise AssertionError({"replay_oof_identity": identity_checks})
+
+        sparse_view = build_replay_observation_view(
+            train_plain_source,
+            train_plain_structural,
+            ledger=replay,
+            first_source_month=full_fold.spec.first_source_month,
+            last_source_month=full_fold.spec.last_source_month,
+        )
+        dense_source = train_plain_source.copy()
+        source_support = _source_view_month_table(
+            sparse_view.source,
+            dense_source,
+            first_source_month=full_fold.spec.first_source_month,
+            last_source_month=full_fold.spec.last_source_month,
+        )
+
+        d0_booster = lgb.Booster(model_file=str(d0_model_path))
+        d0_feature_names = list(d0_manifest.get("feature_names") or d0_booster.feature_name())
+        if len(d0_feature_names) != int(d0_booster.num_feature()):
+            raise AssertionError("D0 feature schema count differs from saved model")
+        a_prediction, a_features = _predict_saved_b3(
+            d0_booster,
+            replay,
+            sparse_view.source,
+            sparse_view.structural,
+            d0_feature_names,
+        )
+        a_difference = a_prediction - oof["prediction"].to_numpy(dtype=np.float64)
+        a_reproduction = {
+            "rows": int(len(a_prediction)),
+            "max_abs_difference_to_saved_oof": float(np.max(np.abs(a_difference))) if len(a_difference) else 0.0,
+            "within_1e-6": bool(not len(a_difference) or np.max(np.abs(a_difference)) <= 1e-6),
+            "d0_model_sha256": _sha256(d0_model_path),
+            "d0_oof_sha256": _sha256(d0_oof_path),
+            "d0_feature_count": int(len(d0_feature_names)),
+        }
+        if not a_reproduction["within_1e-6"]:
+            raise AssertionError({"A_d0_reproduction": a_reproduction})
+        del a_features, d0_booster
+        gc.collect()
+
+        full_schema = json.loads(full_schema_path.read_text(encoding="utf-8"))
+        full_feature_names = list(full_schema.get("feature_names", []))
+        if len(full_feature_names) != 446:
+            raise AssertionError(f"full B3 schema must contain 446 features, found {len(full_feature_names)}")
+        full_booster = lgb.Booster(model_file=str(full_model_path))
+        if int(full_booster.num_feature()) != len(full_feature_names):
+            raise AssertionError("full B3 model/schema feature counts differ")
+        replay_namespaced = _namespace_frame(replay)
+        sparse_source_namespaced = _namespace_frame(sparse_view.source)
+        sparse_structural_namespaced = _namespace_frame(sparse_view.structural)
+        dense_source_namespaced = _namespace_frame(dense_source)
+
+        b_prediction, b_features = _predict_saved_b3(
+            full_booster,
+            replay_namespaced,
+            sparse_source_namespaced,
+            sparse_structural_namespaced,
+            full_feature_names,
+        )
+        b_base = b_features.loc[:, HYDRO_GAP_SAFE_FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True)
+        del sparse_source_namespaced
+        gc.collect()
+
+        c_prediction, c_features = _predict_saved_b3(
+            full_booster,
+            replay_namespaced,
+            dense_source_namespaced,
+            sparse_structural_namespaced,
+            full_feature_names,
+        )
+        c_base = c_features.loc[:, HYDRO_GAP_SAFE_FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=False)
+        base_equal = bool(np.array_equal(b_base, c_base, equal_nan=True))
+        base_difference = np.nan_to_num(b_base, nan=0.0) - np.nan_to_num(c_base, nan=0.0)
+        base_max_abs_difference = float(np.max(np.abs(base_difference))) if base_difference.size else 0.0
+        changed_features: list[dict[str, Any]] = []
+        for column in full_feature_names:
+            left = b_features[column].to_numpy(dtype=np.float32)
+            right = c_features[column].to_numpy(dtype=np.float32)
+            same = np.array_equal(left, right, equal_nan=True)
+            if not same:
+                delta = np.nan_to_num(left, nan=0.0) - np.nan_to_num(right, nan=0.0)
+                changed_features.append({"feature": column, "changed_rows": int(np.sum(~np.isclose(left, right, equal_nan=True, atol=0.0, rtol=0.0))), "max_abs_difference": float(np.max(np.abs(delta)))})
+        ledger_same = True
+        for column in ("sample_id", "source_date", "last_observed_date", "last_observed_TWS", "h", "lat", "lon"):
+            left = replay[column]
+            right = replay_namespaced[column]
+            if column in ("sample_id", "source_date", "last_observed_date"):
+                left_values = left.astype(str).to_numpy()
+                right_values = right.astype(str).str.removeprefix("tr__").to_numpy() if column == "sample_id" else right.astype(str).to_numpy()
+                equal = bool(np.array_equal(left_values, right_values))
+            else:
+                equal = bool(np.array_equal(left.to_numpy(dtype=np.float64), right.to_numpy(dtype=np.float64)))
+            ledger_same = ledger_same and equal
+        structural_clone = _namespace_frame(sparse_view.structural)
+        structural_same = True
+        for column in sparse_structural_namespaced.columns:
+            left = sparse_structural_namespaced[column]
+            right = structural_clone[column]
+            if left.dtype.kind in "OUS" or right.dtype.kind in "OUS":
+                equal = bool(np.array_equal(left.astype(str).to_numpy(), right.astype(str).to_numpy()))
+            else:
+                equal = bool(np.array_equal(left.to_numpy(), right.to_numpy(), equal_nan=True))
+            structural_same = structural_same and equal
+        feature_view_checks = {
+            "B_sparse_source_rows": int(len(sparse_view.source)),
+            "B_sparse_structural_rows": int(len(sparse_view.structural)),
+            "C_dense_source_rows": int(len(dense_source)),
+            "sparse_withheld_window_rows": int(sparse_view.withheld_window_rows),
+            "B_C_same_replay_ledger": ledger_same,
+            "B_C_same_legal_structural_panel": structural_same,
+            "B_C_base_feature_equal": base_equal,
+            "B_C_base_feature_max_abs_difference": base_max_abs_difference,
+            "B_C_changed_feature_count": int(len(changed_features)),
+            "B_C_changed_features": changed_features,
+            "C_interpretation": "retrospective dense historical covariate view; not deployable when those rows are unavailable",
+        }
+        del full_booster, b_features, c_features, b_base, c_base, dense_source_namespaced, structural_clone
+        gc.collect()
+
+        exposure_training = build_sampled_training_rows(
+            train_plain_structural,
+            train_plain_source.loc[:, SOURCE_CORE_COLUMNS],
+            max_target_month=pd.to_datetime(train["time"]).dt.to_period("M").add(1).max(),
+            seed=20260908,
+        )
+        y_delta = _attach_delta(exposure_training.rows, train_plain_labels).astype(np.float32)
+        full_weights = np.asarray(horizon_rebalance_weights(exposure_training.rows["h"]), dtype=np.float32)
+        resolved = json.loads(full_config_path.read_text(encoding="utf-8"))
+        expected_training = resolved.get("training", {})
+        training_hash_checks = {
+            "row_id_hash": {"actual": _hash_values(exposure_training.rows["sample_id"]), "expected": expected_training.get("row_id_hash")},
+            "label_hash": {"actual": _array_hash(y_delta), "expected": expected_training.get("label_hash")},
+            "weight_hash": {"actual": _array_hash(full_weights), "expected": expected_training.get("weight_hash")},
+            "rows": {"actual": int(len(exposure_training.rows)), "expected": expected_training.get("rows")},
+            "dropped_missing_anchor": {"actual": int(exposure_training.dropped_missing_anchor), "expected": expected_training.get("dropped_missing_anchor")},
+        }
+        if any(item["expected"] is not None and item["actual"] != item["expected"] for item in training_hash_checks.values()):
+            raise AssertionError({"full_training_hash_checks": training_hash_checks})
+        exposure, exposure_counts = _tag_training_exposure(replay, exposure_training.rows)
+
+        event = exposure.copy()
+        event["target"] = oof["target"].to_numpy(dtype=np.float64)
+        event["a_prediction"] = a_prediction
+        event["b_prediction"] = b_prediction
+        event["c_prediction"] = c_prediction
+        event["persistence_prediction"] = replay["last_observed_TWS"].to_numpy(dtype=np.float64)
+        event["source_month"] = pd.to_datetime(event["source_date"]).dt.to_period("M").astype(str)
+        event["target_month"] = (pd.to_datetime(event["source_date"]) + pd.offsets.MonthBegin(1)).dt.to_period("M").astype(str)
+        event["anchor_age_months"] = (
+            pd.to_datetime(event["source_date"]).dt.to_period("M").astype("int64")
+            - pd.to_datetime(event["last_observed_date"]).dt.to_period("M").astype("int64")
+        ).astype(int)
+        event["cell_lat5"] = np.floor(event["lat"].astype(float) / 5.0) * 5.0
+        event["cell_lon5"] = np.floor(event["lon"].astype(float) / 5.0) * 5.0
+        scopes = {
+            "complete_replay": event,
+            "exact_exposure": event.loc[event["exact_training_exposure"]].copy(),
+            "different_anchor": event.loc[event["exposure_status"] == "different_anchor"].copy(),
+        }
+        overall = _comparison_metric_table(event, [], scopes)
+        by_month_h = _comparison_metric_table(event, ["source_month", "target_month", "h"], scopes)
+        by_age = _comparison_metric_table(event, ["anchor_age_months"], scopes)
+        all_cells, top_cells, cell_checks = _cell_metric_table(event, scopes)
+        support = event.groupby(["source_month", "target_month", "h"], sort=True).agg(
+            rows=("sample_id", "size"),
+            exact_exposure_rows=("exact_training_exposure", "sum"),
+            source_id_in_full_training_rows=("source_id_in_full_training", "sum"),
+        ).reset_index()
+        support["different_anchor_rows"] = support["source_id_in_full_training_rows"] - support["exact_exposure_rows"]
+        exposure_status_table = event["exposure_status"].value_counts().rename_axis("exposure_status").reset_index(name="rows")
+        source_support.to_csv(args.run_dir / "matched_source_view_by_month.csv", index=False)
+        overall.to_csv(args.run_dir / "matched_overall.csv", index=False)
+        by_month_h.to_csv(args.run_dir / "matched_by_month_h.csv", index=False)
+        by_age.to_csv(args.run_dir / "matched_by_anchor_age.csv", index=False)
+        support.to_csv(args.run_dir / "matched_month_h_support.csv", index=False)
+        exposure_status_table.to_csv(args.run_dir / "matched_exposure_status.csv", index=False)
+        all_cells.to_csv(args.run_dir / "matched_cells_all.csv", index=False)
+        top_cells.to_csv(args.run_dir / "matched_cells_top5.csv", index=False)
+        pd.DataFrame(cell_checks).to_csv(args.run_dir / "matched_cell_sse_checks.csv", index=False)
+
+        decomposition_columns = [column for column in overall.columns if column.endswith("_decomposition_error")]
+        decomposition_max = max(
+            (float(np.max(np.abs(overall[column].dropna().to_numpy(dtype=np.float64)))) for column in decomposition_columns if not overall[column].dropna().empty),
+            default=0.0,
+        )
+        focus = by_month_h.loc[
+            (by_month_h["scope"] == "complete_replay")
+            & by_month_h["source_month"].isin(["2015-01", "2015-02", "2015-06"])
+        ].copy()
+        result = {
+            "origin": origin,
+            "replay_window": {"first_source_month": full_fold.spec.first_source_month, "last_source_month": full_fold.spec.last_source_month},
+            "d0_package": str(d0_dir),
+            "d0_model": {"path": str(d0_model_path), "sha256": _sha256(d0_model_path)},
+            "d0_oof": {"path": str(d0_oof_path), "sha256": _sha256(d0_oof_path), "rows": int(len(oof))},
+            "full_model": {"path": str(full_model_path), "sha256": _sha256(full_model_path), "feature_schema_sha256": full_schema.get("schema_sha256")},
+            "replay_oof_identity": identity_checks,
+            "A_d0_sparse_replay": a_reproduction,
+            "B_full_model_sparse_replay_vs_C_dense": feature_view_checks,
+            "full_training_reconstruction": {"rows": int(len(exposure_training.rows)), "horizon_counts": {str(k): int(v) for k, v in exposure_training.rows["h"].value_counts().sort_index().items()}, "hash_checks": training_hash_checks},
+            "exposure_counts": exposure_counts,
+            "metrics": {"overall": overall.to_dict(orient="records"), "focus_2015_months": focus.to_dict(orient="records")},
+            "cell_sse_conservation": {"checks": cell_checks, "all_ok": bool(all(row["ok"] for row in cell_checks)), "max_abs_difference": max((float(row["abs_difference"]) for row in cell_checks), default=0.0)},
+            "max_abs_rmse_decomposition_error": decomposition_max,
+            "output_files": {
+                "source_view_by_month": str(args.run_dir / "matched_source_view_by_month.csv"),
+                "overall": str(args.run_dir / "matched_overall.csv"),
+                "by_month_h": str(args.run_dir / "matched_by_month_h.csv"),
+                "by_anchor_age": str(args.run_dir / "matched_by_anchor_age.csv"),
+                "month_h_support": str(args.run_dir / "matched_month_h_support.csv"),
+                "exposure_status": str(args.run_dir / "matched_exposure_status.csv"),
+                "cells_all": str(args.run_dir / "matched_cells_all.csv"),
+                "cells_top5": str(args.run_dir / "matched_cells_top5.csv"),
+                "cell_sse_checks": str(args.run_dir / "matched_cell_sse_checks.csv"),
+            },
+            "no_row_level_prediction_file_written": True,
+            "interpretation_limits": [
+                "A_vs_B measures the joint effect of later training exposure and the resulting fitted model, not a pure causal recency effect.",
+                "B_vs_C is a fixed-model retrospective availability intervention; C is not deployable if dense covariates are unavailable.",
+                "Horizon-weighted values are validation proxies and h>7 rows remain a separate stress tail.",
+            ],
+        }
+        _json(args.run_dir / "matched_comparison_details.json", result)
+        del train, train_plain_structural, train_plain_source, train_plain_labels, replay, exposure, event, scopes, source_support
+        gc.collect()
+        _stage_finish(path, manifest, started, details_path=str(args.run_dir / "matched_comparison_details.json"), matched=result)
     except Exception as exc:
         _stage_fail(path, manifest, started, exc)
         raise
@@ -1126,6 +1712,7 @@ STAGES = {
     "oof_decomposition": stage_oof_decomposition,
     "full_fit": stage_full_fit,
     "tree_inspection": stage_tree_inspection,
+    "matched_comparison": stage_matched_comparison,
     "test_support": stage_test_support,
     "sample_inference": stage_sample_inference,
 }
@@ -1142,6 +1729,9 @@ def main() -> None:
     parser.add_argument("--expected-commit", default=None)
     parser.add_argument("--batch-size", type=int, default=20_000)
     parser.add_argument("--sample-size", type=int, default=2048)
+    parser.add_argument("--matched-origin", default="2014-12")
+    parser.add_argument("--d0-model-dir", type=Path, default=None)
+    parser.add_argument("--d0-oof", type=Path, default=None)
     args = parser.parse_args()
     if args.batch_size < 1:
         raise ValueError("batch-size must be positive")
