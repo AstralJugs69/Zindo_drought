@@ -614,7 +614,7 @@ def _aggregate_error_frame(frame: pd.DataFrame, group_columns: list[str], *, err
     return pd.DataFrame(rows)
 
 
-def _tree_gain_groups(booster: Any) -> tuple[pd.DataFrame, dict[str, Any]]:
+def _tree_gain_groups(booster: Any, feature_names: list[str] | None = None) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Summarize saved LightGBM split gains descriptively by feature family."""
     dump = booster.dump_model()
     gains: dict[str, float] = {}
@@ -638,7 +638,10 @@ def _tree_gain_groups(booster: Any) -> tuple[pd.DataFrame, dict[str, Any]]:
         split = node.get("split_feature")
         gain = float(node.get("split_gain", 0.0) or 0.0)
         if split is not None:
-            name = str(split)
+            if isinstance(split, (int, np.integer)) and feature_names and 0 <= int(split) < len(feature_names):
+                name = feature_names[int(split)]
+            else:
+                name = str(split)
             key = family(name)
             gains[key] = gains.get(key, 0.0) + gain
             counts[key] = counts.get(key, 0) + 1
@@ -743,7 +746,7 @@ def stage_full_fit(args: argparse.Namespace) -> None:
         geo_table.to_csv(args.run_dir / "fit_by_geo5.csv", index=False)
         late_geo = aggregates.loc[aggregates["source_year"].eq(2015)].copy()
         late_geo.to_csv(args.run_dir / "fit_late_2015_by_geo5.csv", index=False)
-        gain_table, tree_metadata = _tree_gain_groups(booster)
+        gain_table, tree_metadata = _tree_gain_groups(booster, feature_names)
         gain_table.to_csv(args.run_dir / "fit_tree_gain_groups.csv", index=False)
         expected_preflight = resolved.get("data_preflight", {}).get("sha256", {})
         current_hashes = {name: _sha256(args.data_dir / name) for name in ("Train.csv", "Test.csv", "SampleSubmission.csv")}
@@ -763,6 +766,29 @@ def stage_full_fit(args: argparse.Namespace) -> None:
         del maps, train, train_source, train_structural, rows, aggregate_parts, aggregates
         gc.collect()
         _stage_finish(path, manifest, started, details_path=str(args.run_dir / "full_fit_details.json"), fit=result)
+    except Exception as exc:
+        _stage_fail(path, manifest, started, exc)
+        raise
+
+
+def stage_tree_inspection(args: argparse.Namespace) -> None:
+    """Inspect saved trees without rereading the challenge data."""
+    path, manifest, started = _stage_start(args.run_dir, "tree_inspection", args.expected_commit)
+    try:
+        import lightgbm as lgb
+
+        model_path = args.model_dir.resolve() / "model.txt"
+        schema_path = args.model_dir.resolve() / "feature_schema.json"
+        if not model_path.is_file() or not schema_path.is_file():
+            raise FileNotFoundError("saved model/schema is missing")
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        names = list(schema.get("feature_names", []))
+        booster = lgb.Booster(model_file=str(model_path))
+        table, metadata = _tree_gain_groups(booster, names)
+        table.to_csv(args.run_dir / "fit_tree_gain_groups.csv", index=False)
+        result = {"model_path": str(model_path), "model_sha256": _sha256(model_path), "feature_count": len(names), "tree_metadata": metadata, "tree_gain_csv": str(args.run_dir / "fit_tree_gain_groups.csv")}
+        _json(args.run_dir / "tree_inspection_details.json", result)
+        _stage_finish(path, manifest, started, details_path=str(args.run_dir / "tree_inspection_details.json"), trees=result)
     except Exception as exc:
         _stage_fail(path, manifest, started, exc)
         raise
@@ -1068,6 +1094,7 @@ STAGES = {
     "target_behavior": stage_target_behavior,
     "oof_decomposition": stage_oof_decomposition,
     "full_fit": stage_full_fit,
+    "tree_inspection": stage_tree_inspection,
     "test_support": stage_test_support,
     "sample_inference": stage_sample_inference,
 }
