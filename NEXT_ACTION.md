@@ -1,3 +1,41 @@
+# Next action — covariate-gap decision closed
+
+## 2026-09-09 — final augmentation checkpoint
+
+- The deterministic Test-shaped covariate-history gap experiment is complete on
+  Kaggle. It used only Test source-date geometry to derive masks; no Test labels,
+  predictions, or submission files were created, and no run artifacts were
+  copied to Windows.
+- The predeclared inner screen compared `D0_dense`, `D1_sparse`, and
+  `D2_mixed` on 2003-04 and 2004-04. Both augmented recipes improved the
+  seed-mean official h=1..7 weighted RMSE on both inner origins. `D1_sparse`
+  won the equal-origin mean (0.566690 versus D2's 0.566941) and was therefore
+  the only recipe taken to the four outer replays with seeds 20260909/10.
+- Outer D1 improved 2007-09 by 0.006003 and 2009-01 by 0.004169, but regressed
+  complete 2014-12 by 0.003792. 2014-04 has no h=4 rows, so its official gate
+  is incomplete; the present-horizon diagnostic worsened by 0.006348. The
+  analyzer records `official_gate_complete=false`, blocker `2014-04`, and
+  `promote=false`.
+- **Decision:** reject `D1_sparse` as a deployment/training replacement and
+  retain dense **B3/98**. Keep the augmentation code and remote artifacts as
+  audit evidence; do not tune this recipe further and do not generate Test
+  predictions or a competition submission.
+- Source and artifacts are pinned in `HYDROLOGICAL_HISTORY_RESULTS.md`.
+  The final remote checkout is clean at
+  `8154633d450ed9ca76b038f7c72b23ccc0cef621`; analysis JSONs remain under
+  `/kaggle/working/drought_runs/` and are inspectable through `ssh kaggle`.
+
+## Safe continuation
+
+1. Treat B3/98 as the current strongest verified development baseline.
+2. If work resumes, first identify and verify a genuinely unused confirmation
+   period, freeze any independently motivated hypothesis and metric gate, and
+   evaluate once on Kaggle. Do not use the four replay origins above as
+   independent confirmation.
+3. If the Kaggle runtime restarts, reconnect with `ssh kaggle`, verify the
+   remote checkout and `drought_runs`, and never assume an endpoint change is a
+   key or repository problem.
+
 # Next action — compact neural sequence comparison closed
 
 ## 2026-09-08 — decision checkpoint

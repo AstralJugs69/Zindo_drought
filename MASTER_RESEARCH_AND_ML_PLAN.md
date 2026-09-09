@@ -9,6 +9,36 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
+## 2026-09-09 — covariate-history gap augmentation decision
+
+The predeclared follow-up tested whether B3/98 training exposure should mimic
+the sparse Test observation schedule. Test was read only for source-date
+geometry: deterministic relative-date masks were derived without using labels,
+target values, predictions, or submission outputs. The legal B3 trajectory
+builder then produced the same 446-feature schema under `D0_dense` (unmasked),
+`D1_sparse`, and `D2_mixed` (50/50), with fixed sampled training rows,
+labels/weights, 98 LightGBM rounds, and two augmentation seeds.
+
+Inner selection on the frozen 2003-04/2004-04 replays required an improvement
+over D0 on both origins. D1 and D2 both qualified; D1 won the equal-origin
+official weighted mean (0.566690 versus 0.566941). The selected D1 recipe was
+then evaluated with both seeds on 2007-09, 2009-01, 2014-04, and 2014-12.
+
+| Outer origin | D1 minus D0 official weighted RMSE | Gate interpretation |
+|---|---:|---|
+| 2007-09 | −0.006003 | improvement |
+| 2009-01 | −0.004169 | improvement |
+| 2014-04 | n/a; present-horizon +0.006348 | h=4 absent; diagnostic worsens |
+| 2014-12 | +0.003792 | complete official regression |
+
+The strict promotion rule therefore remains false (`official_gate_complete=false`,
+blocker `2014-04`). **Retain dense B3/98 and reject D1 as a deployment or
+training replacement.** This result is development robustness evidence only;
+the augmentation implementation and all checksummed Kaggle manifests remain
+available for audit, while no Test predictions or submission files were made.
+See `HYDROLOGICAL_HISTORY_RESULTS.md` for per-horizon, anchor-age, coverage,
+commit, and artifact details.
+
 ## 2026-09-08 — compact neural sequence decision
 
 The predeclared availability-faithful MLP/GRU/TCN comparison is complete. Inner selection chose a 12-calendar-slot GRU at epoch 1 (mean two-origin, two-seed raw RMSE 0.602960), but paired outer replay OOFs show it is worse than frozen B3/98 overall: 0.613169 versus 0.595026 raw RMSE (+0.018143). The GRU regressed on 2007-09, 2009-01, and 2014-04 and helped only on 2014-12; the predeclared equal B3/GRU blend is adverse overall (+0.002334). Calendar- and geography-block bootstraps remain adverse for GRU. A third seed and lawful older-history ablation were completed: hiding older sequence slots costs +0.005503 inner RMSE, showing some history use but no transferable model advantage. Retain B3/98; do not promote the compact neural branch or create Test predictions. This is development evidence, not independent confirmation; exact artifacts and the OOM recovery are recorded in `HYDROLOGICAL_HISTORY_RESULTS.md`.

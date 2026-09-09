@@ -12,6 +12,116 @@ to each runner's `--expected-commit`; the runner records it in its manifest.
 **Environment:** the repaired Kaggle checkout and experiment root are writable
 by `kaggle`; all fitting/scoring in this record is Kaggle-only.
 
+## 2026-09-09 — deterministic covariate-history gap augmentation (final decision)
+
+This experiment asked whether B3/98 becomes more availability-faithful when its
+training covariates are exposed to deterministic, Test-shaped history gaps. The
+Test table was used only to derive the set of relative source-date masks (no
+labels, target values, Test predictions, or submission files were produced).
+For each sample, the implementation in
+`src/covariate_gap_augmentation.py` recomputes the legal B3 trajectories under
+the mask, preserving calendar time, the current slot, and the legal TWS anchor.
+It produces the same 446-column schema as B3. `D0_dense` is the unmasked
+reference, `D1_sparse` applies the sparse Test-like mask, and `D2_mixed` mixes
+the two deterministically. The schedule-pattern fingerprint for every run is
+`5f3c8dca628d30982f933fa0b6b861f93130376087b61ea5236893880c1c5f7d`.
+
+The training sample IDs, labels, weights, validation IDs, LightGBM settings
+(98 rounds), and row sampler were held fixed within each origin. Inner fits used
+the predeclared 2003-04 and 2004-04 replays; augmented recipes used seeds
+20260909 and 20260910. A recipe qualified only if its seed-mean official h=1..7
+weighted RMSE improved D0 on both inner origins; the lower equal-origin mean
+then selected the recipe for the outer replay.
+
+### Inner selection
+
+| Inner origin | D0 dense | D1 sparse (two-seed mean) | D2 mixed (two-seed mean) | D1 gain vs D0 | D2 gain vs D0 |
+|---|---:|---:|---:|---:|---:|
+| 2003-04 | 0.580620 | 0.578124 | **0.578100** | +0.002496 | +0.002520 |
+| 2004-04 | 0.560684 | **0.555256** | 0.555782 | +0.005427 | +0.004901 |
+| Equal-origin mean | 0.570652 | **0.566690** | 0.566941 | — | — |
+
+Both augmented recipes passed the directional inner screen. `D1_sparse` was
+selected by the predeclared lower equal-origin mean (the analyzer records the
+selection rule and the 0.0001 D2 tie preference).
+
+### Conditional outer replay
+
+The selected D1 recipe was fit with both seeds on all four declared outer
+origins and compared by paired validation IDs with the corresponding D0 fit.
+The official metric is the competition h=1..7 weighted RMSE. April 2014 has no
+h=4 rows in the replay calendar, so its official metric is intentionally `n/a`;
+the renormalized present-horizon value is diagnostic only and cannot pass the
+promotion gate.
+
+| Origin | D0 official | D1 official / present | D1 − D0 (official / present) | D0 raw | D1 raw | h>7 tail D0 / D1 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2007-09 | 0.528340 | 0.522337 | **−0.006003** | 0.528354 | 0.522351 | n/a / n/a (0 rows) |
+| 2009-01 | 0.560226 | 0.556057 | **−0.004169** | 0.560377 | 0.556197 | n/a / n/a (0 rows) |
+| 2014-04 | n/a (h=4 absent) | n/a / 0.546358 | n/a / **+0.006348** | 0.582737 | 0.587337 | 1.103301 / 1.001798 (97 rows) |
+| 2014-12 | 0.789549 | 0.793342 | **+0.003792** | 0.809688 | 0.810825 | 1.124937 / 1.119641 (90 rows) |
+
+The April present-horizon denominator is only 0.889394 of the official weight
+because h=4 is absent. The h-by-h table is retained in the analyzer artifact;
+for April, the D1-minus-D0 raw RMSE deltas are +0.010784 (h1), +0.005206
+(h2), +0.004630 (h3), −0.017271 (h5, five rows), +0.007949 (h6), and
+−0.003834 (h7). The recent-origin regressions are concentrated in fresh
+anchors: D1-minus-D0 raw RMSE by anchor age (0, 1, 2, 3+) is −0.008053,
+−0.003504, −0.002304, −0.006054 for 2007-09; +0.001267, −0.004775,
+−0.004970, −0.007117 for 2009-01; +0.011007, +0.005548, +0.005028,
++0.002049 for 2014-04; and +0.014100, +0.003685, −0.002959, −0.000447
+for 2014-12.
+
+The analyzer therefore records `official_gate_complete=false`, blocker
+`2014-04`, and `promote=false`. Even though D1 helps the two older outer
+origins and slightly reduces the December stress tail, it regresses December's
+complete official score and worsens April's supported-horizon diagnostic. The
+equal-origin present-horizon delta (−0.000008) is not evidence of promotion
+because the official gate is incomplete.
+
+**Durable decision:** reject `D1_sparse` as a training/deployment replacement
+and retain dense **B3/98** as the strongest verified development baseline. Keep
+the augmentation implementation and Kaggle artifacts as audit evidence; do not
+run a tuning grid, generate Test predictions, or create a submission from this
+branch. These four outer replays remain development robustness evidence, not
+independent confirmation.
+
+### Reproducibility and artifact index
+
+The inner/outer runner implementation was committed at
+`40fde25ec766084937451b5ab8e0ec188de389ae`; the December full-tail correction
+was `5dd67cbaa459dba63909038cb8488cda50910811`; the final analyzer/reporting
+tests are in `8154633d450ed9ca76b038f7c72b23ccc0cef621`. The completed remote
+checkout is clean at the latter commit. All run directories below are under
+`/kaggle/working/drought_runs/` and each manifest records the fixed training,
+validation, feature, and source fingerprints.
+
+| Artifact | Remote path | Size (bytes) | SHA-256 |
+|---|---|---:|---|
+| Inner analysis | `covariate_gap_inner_20260909T000000Z_analysis_v3/gap_augmentation_analysis.json` | 3,578 | `0f76aefab39be32e0a98512ce76d6beeac6d7c0f42b4f1dceb1e2bc3f16225bb` |
+| Outer analysis | `covariate_gap_outer_20260909T000000Z_analysis_v3/gap_augmentation_analysis.json` | 24,674 | `97af01d9f48204991f2779fefcb378be3f3a6230e76ca51247423f4bbe5c5c9a` |
+| Outer D0 2007-09 package | `covariate_gap_outer_20260909T000000Z_D0_2007_09` | 10,387,175 | `89a3c8f6bdb7c5f90006ba41954878844d117a91d989fe80568185eee98f2da9` |
+| Outer D1 2007-09 packages (s09/s10) | `...D1_2007_09_s20260909`, `...D1_2007_09_s20260910` | 10,376,966 / 10,380,810 | `5b5a0e349f14f574b8d4c02f26592be8baed4c8bd89a59b3d685b71965cc1613` / `40fdbe127dc6d2481b792b2130783a9bb2918b33fa7b32ebbc7f3354a08aa206` |
+| Outer D0 2009-01 package | `covariate_gap_outer_20260909T000000Z_D0_2009_01` | 10,233,865 | `66108024abb79e7fd3393f058bee2fc01481beb5f906c8c141d8f6dff9707d99` |
+| Outer D1 2009-01 packages (s09/s10) | `...D1_2009_01_s20260909`, `...D1_2009_01_s20260910` | 10,245,259 / 10,241,082 | `7e5bd6645c833364609fa5a84e122bc94ad522e2141a69c2a1d6ae3f6ee1ebb9` / `22fff1e6927c75db401902092cdf63b74fbebf793799f9ceb9da87c301959475` |
+| Outer D0 2014-04 package | `covariate_gap_outer_20260909T000000Z_D0_2014_04` | 3,161,345 | `46113f752b106d462cbb8ae1b5053afcec702cc494ec79897579f0f6128a1084` |
+| Outer D1 2014-04 packages (s09/s10) | `...D1_2014_04_s20260909`, `...D1_2014_04_s20260910` | 3,158,733 / 3,157,955 | `673e4862c0fa0c19c041ac10fcdb0b536f884468a2fc561f5e9870bb344735bb` / `075593f4ac0490367ecae458ba89c0e65377a164336a705daf0234ba53c665e8` |
+| Outer D0 2014-12 package | `covariate_gap_outer_20260909T000000Z_D0_2014_12` | 4,311,661 | `e73a4fd4bd920248757587dad139b45c8194a9e12be4fe0f6158570b31bd50c3` |
+| Outer D1 2014-12 packages (s09/s10) | `...D1_2014_12_s20260909`, `...D1_2014_12_s20260910` | 4,307,893 / 4,308,635 | `2e415391030e18ab4f5f5b3bbb7bb5dcf65893d79df6290c6a2a55ce87c1f734` / `77077a83805abf2092ea0c2a2d7063d11fc80489756f9e4a5d3da4f7edf33465` |
+
+The ten inner package hashes are recorded in their manifests: D0
+2003-04/2004-04 (`f458c046b32ab44d02130564efa9dc7a4fb235132a6b83a139378f71ebc74b56`,
+`f7d590e6a6ca7a2eef5aa5750301052e7269f1d91fc6d952bf298895b3d68095`), D1
+2003-04/2004-04 seeds 09/10 (`a25602951e7e37a3bf1ba0a835debe0963b9f8e1e6df1f2eaf6776791072d44d`,
+`a6c33c835819fdea809f1321d50841e79623f3fd3117c2c6be1b85395fe8ed4e`,
+`7623bad3da95e9c1bb9d8fc10188933ba975335b14906041d4c1e3e1eb1c06bf`,
+`5f4e885b53abbf584aa528a3a84fb7bd2f7bd25998e175d3dbeb8588bebe23f0`), and
+D2 2003-04/2004-04 seeds 09/10
+(`1154f989008593d99f9738aad2bdb18374395c81e36d3c6d4f7e151dd61c6ad1`,
+`64abbcaab7a340ff137c50d50c008362b02887645af7f8f9ab8ec374ae8438ce`,
+`fcc8b2ee51e1d26545505583e7e9a94540a627aaf6cf658258edabf4ad0674a2`,
+`b5e890b92ab6ce93638151043ec76bffce2b9f36ae17314def14ab5f2bf6e2b2`).
+
 ## Verified inherited baseline evidence
 
 The completed Kaggle artifact
