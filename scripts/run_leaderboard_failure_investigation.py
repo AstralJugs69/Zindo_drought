@@ -434,7 +434,6 @@ def stage_target_behavior(args: argparse.Namespace) -> None:
         # makes the comparison explicit rather than silently dropping them.
         wide = panel.groupby(["lat", "lon", "calendar_month", "source_year"], sort=False)["delta"].mean().unstack("source_year")
         prior_columns = [c for c in [2012, 2013, 2014] if c in wide.columns]
-        matched = wide.loc[wide.index.get_level_values("calendar_month").isin([1, 2, 6]) & wide.index.get_level_values("source_year").isin([2015])]
         # The source-year level is in the columns after unstack; filter rows
         # with 2015 and retain the same location/calendar keys from the index.
         if 2015 in wide.columns and prior_columns:
