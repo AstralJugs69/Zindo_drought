@@ -1,5 +1,36 @@
 # Next action — B3/98 full submission result recorded
 
+## 2026-09-09 — leaderboard root-cause investigation complete
+
+The read-only investigation is recorded in
+`LEADERBOARD_ROOT_CAUSE_REPORT.md`. It did not fit a model, create a Test
+prediction file, or upload anything. The saved B3/98 submission is internally
+reproducible: Train/Test/SampleSubmission hashes and ID order match, the exact
+next-calendar target join has 1,977,398 zero-difference matches (176,623
+terminal rows are explicitly unmatched), and a deterministic saved-model Test
+sample matches the submitted CSV to `4.44e-16`. Batch/shuffle order, masked-TWS
+perturbation, and later-covariate causality checks all pass.
+
+The measured cause of the public `0.750207364` gap is now ranked as late-period
+target-process/transfer shift first, with historical support mismatch (sparse
+Test months and increasing legal-anchor age) as a contributor. Train target
+behaviour is materially harder in 2015 (target-current RMSE 1.012/1.189/1.182
+for Jan/Feb/Jun versus 0.433--0.615 in matched earlier months), and the change
+is dispersed across hundreds of 5-degree cells. Test hydro covariates are
+finite and within Train ranges, so an export defect or simple numeric
+extrapolation is not supported. Existing outer OOF remains development
+evidence: pooled h1--7 weighted B3/persistence is `0.583339/0.689653`, while
+the late Dec-2014 fold is `0.789549` weighted (`0.809688` raw).
+
+**Exactly one next experiment:** a frozen, late-prefix, Test-schedule-matched
+recency-weighted B3/98 fit, trained through source month 2015-06 and evaluated
+once on held-out source months 2015-07/08. Use the unchanged 446-feature,
+63-leaf/98-round recipe and one predeclared Test-support-derived weight; no
+grid, Test labels, prediction file, or submission. Falsify if both held-out
+months do not improve by at least `0.005`, official h1--7 worsens by more than
+`0.005`, or any availability/hash invariant fails. Verify that this block has
+not already influenced a model choice before running it.
+
 ## 2026-09-09 — frozen full-training deployment
 
 - The one authorized full-training deployment run completed on Kaggle from

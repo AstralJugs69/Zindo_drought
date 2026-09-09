@@ -9,6 +9,36 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
+## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
+
+The frozen dense-history B3/98 public score is `0.750207364`. A read-only
+investigation (full details in `LEADERBOARD_ROOT_CAUSE_REPORT.md`) separates
+implementation integrity from transfer behaviour. The submitted CSV is
+reproducible by exact SHA/ID/order checks and a fresh saved-model inference
+sample; the exact next-calendar Train target join has zero difference on
+1,977,398 matched rows and no duplicate location-month keys. Perturbing all
+masked Test TWS values after the legal visibility builder, changing request
+order/batch size, and changing later covariates all preserve earlier predictions.
+
+The leading explanation is not an export defect. Train target dynamics become
+substantially harder in 2015: target-current RMSE is 1.012/1.189/1.182 for
+Jan/Feb/Jun, compared with 0.433--0.615 in matched 2012--2014 months, and the
+matched-location difference RMSE is 1.194/1.293/1.358. The increase is spread
+over roughly 900 5-degree cells per month. Historical OOF is optimistic and
+overlapping: four outer folds pool to B3 raw/weighted `0.595116/0.583339`, but
+the Dec-2014 late fold is `0.809688/0.789549`; the full-model in-sample score
+is `0.535382`. Test covariates are finite and within Train ranges, while sparse
+Test source months and growing legal-anchor age reduce history support.
+
+This changes the plan gate: do not tune the public file or infer hidden labels.
+The one next experiment is a frozen late-prefix, Test-schedule-matched,
+recency-weighted B3/98 fit (prefix through source month 2015-06; held-out
+2015-07/08 targets; unchanged 446 features and capacity; one predeclared
+Test-support-derived weight). Falsify at a `0.005` two-month improvement gate,
+the official h1--7 degradation gate, or any availability/hash failure. Verify
+the held-out block has not influenced prior choices, run once on Kaggle, and do
+not create a Test prediction or submission from this diagnostic branch.
+
 ## 2026-09-09 — frozen full-training B3/98 submission result
 
 The selected dense-history B3/98 control was fit once on Kaggle with the full

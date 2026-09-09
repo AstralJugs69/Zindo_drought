@@ -1,5 +1,48 @@
 # Hydrological history results
 
+## 2026-09-09 — B3 leaderboard root-cause investigation
+
+`LEADERBOARD_ROOT_CAUSE_REPORT.md` contains the complete read-only diagnostic
+record. The investigation used separate, memory-bounded Kaggle stages and did
+not fit, calibrate, score a new candidate, write a Test prediction file, or
+upload to Zindi. The compact stage outputs remain remote under
+`/kaggle/working/drought_runs/leaderboard_failure_20260909T123000Z/` (integrity,
+target alignment/behaviour, and OOF decomposition),
+`leaderboard_failure_20260909T150000Z/` (saved-model fit, tree gains, and Test
+support), and `leaderboard_failure_20260909T160000Z/` (sample inference).
+
+Key reproducibility results:
+
+- The submitted B3 CSV SHA is still
+  `62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c`; Test and
+  SampleSubmission IDs match exactly and all 280,961 predictions are finite.
+- Exact `(lat, lon, source_month + one calendar month)` target alignment has
+  1,977,398 matched rows with maximum difference `0.0`; 176,623 terminal rows
+  are explicitly unmatched; no duplicate location-month keys exist.
+- Rebuilding the saved model and legal 446-feature maps for 1,686 deterministic
+  Test IDs matches the submitted file to `4.44e-16`. Batch sizes 1/17/257/1686,
+  shuffled request order, all masked-TWS perturbations, and later-covariate
+  causality checks have maximum difference `0.0`.
+
+Measured transfer evidence explains why the public result is lower than the
+pooled historical picture. Target-current RMSE in Train source months
+2015-01/02/06 is `1.012330/1.189415/1.181583`, versus `0.433167--0.615270`
+for the matched 2012--2014 months; 2015 matched-panel differences are
+`1.194051/1.293305/1.358138` RMSE for Jan/Feb/Jun. The 75%-SSE thresholds are
+197/175/200 5-degree cells (only 27.1%/24.2%/28.8% of rows), so the change is
+dispersed rather than a single geographic defect. The four outer D0 folds pool
+to B3/persistence raw RMSE `0.595116/0.712119` and h1--7 weighted
+`0.583339/0.689653`, but Dec-2014 is `0.789549` weighted and `0.809688` raw.
+The full saved-model fit is `0.535382` versus `0.686105` persistence, making
+fit optimism visible. Test hydro values remain finite and inside Train ranges;
+support differences are mainly sparse legal history and anchor age.
+
+**Decision:** rank late-period target-process/transfer shift first and sparse
+Test support second; treat export/ID/target-row defects as contradicted for the
+tested paths. The only proposed follow-up is the frozen late-prefix,
+Test-schedule-matched recency-weighted B3/98 experiment documented in
+`NEXT_ACTION.md`; it is not run or authorized as a submission.
+
 **Status:** Stage A and all fixed-capacity Stage B outer/inner ablations are
 completed. B3/98 is the frozen Stage B selection by mean inner weighted RMSE;
 the margin over B2 is too small to treat as a practical deployment promotion.
