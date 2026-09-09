@@ -74,6 +74,16 @@ def _metric(frame: pd.DataFrame) -> dict[str, object]:
     if present == list(range(1, 8)):
         weighted, table = score_by_horizon(supported.target, supported.prediction, supported.h)
         by_h = table.reset_index().to_dict(orient="records")
+    elif len(supported):
+        by_h = []
+        for horizon, group in supported.groupby("h", sort=True):
+            error = group.prediction.to_numpy(float) - group.target.to_numpy(float)
+            by_h.append({
+                "h": int(horizon), "rows": int(len(group)),
+                "mse": float(np.mean(np.square(error))),
+                "rmse": float(np.sqrt(np.mean(np.square(error)))),
+                "bias": float(np.mean(error)),
+            })
     present_weighted = None
     if len(supported):
         # This is a diagnostic for calendar blocks with absent horizons.  It

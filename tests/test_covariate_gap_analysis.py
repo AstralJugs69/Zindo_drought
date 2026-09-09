@@ -43,6 +43,7 @@ def test_metric_reports_present_horizon_diagnostic_without_inventing_official_sc
     metric = _metric(frame)
     assert metric["official_h1_7_weighted_rmse"] is None
     assert metric["official_horizons_present"] == [1, 2, 3, 5, 6, 7]
+    assert [row["h"] for row in metric["by_h"]] == [1, 2, 3, 5, 6, 7]
     assert metric["present_h1_7_weighted_rmse"] == 1.0
     assert metric["present_horizon_weight_total"] < 1.0
     assert metric["stress_h_gt7_rows"] == 1
