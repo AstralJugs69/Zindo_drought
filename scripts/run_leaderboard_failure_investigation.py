@@ -1213,27 +1213,29 @@ def stage_matched_comparison(args: argparse.Namespace) -> None:
         full_booster = lgb.Booster(model_file=str(full_model_path))
         if int(full_booster.num_feature()) != len(full_feature_names):
             raise AssertionError("full B3 model/schema feature counts differ")
-        replay_namespaced = _namespace_frame(replay)
-        sparse_source_namespaced = _namespace_frame(sparse_view.source)
-        sparse_structural_namespaced = _namespace_frame(sparse_view.structural)
-        dense_source_namespaced = _namespace_frame(dense_source)
+        # Use the same plain replay IDs for A, B, and C.  The full submission's
+        # ``tr__`` namespace is only a join-safety convention; it is not a model
+        # feature and must not become a comparison intervention.
+        replay_input = replay.copy()
+        sparse_source_input = sparse_view.source.copy()
+        sparse_structural_input = sparse_view.structural.copy()
+        dense_source_input = dense_source.copy()
 
         b_prediction, b_features = _predict_saved_b3(
             full_booster,
-            replay_namespaced,
-            sparse_source_namespaced,
-            sparse_structural_namespaced,
+            replay_input,
+            sparse_source_input,
+            sparse_structural_input,
             full_feature_names,
         )
         b_base = b_features.loc[:, HYDRO_GAP_SAFE_FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=True)
-        del sparse_source_namespaced
         gc.collect()
 
         c_prediction, c_features = _predict_saved_b3(
             full_booster,
-            replay_namespaced,
-            dense_source_namespaced,
-            sparse_structural_namespaced,
+            replay_input,
+            dense_source_input,
+            sparse_structural_input,
             full_feature_names,
         )
         c_base = c_features.loc[:, HYDRO_GAP_SAFE_FEATURE_COLUMNS].to_numpy(dtype=np.float32, copy=False)
@@ -1251,18 +1253,16 @@ def stage_matched_comparison(args: argparse.Namespace) -> None:
         ledger_same = True
         for column in ("sample_id", "source_date", "last_observed_date", "last_observed_TWS", "h", "lat", "lon"):
             left = replay[column]
-            right = replay_namespaced[column]
+            right = replay_input[column]
             if column in ("sample_id", "source_date", "last_observed_date"):
-                left_values = left.astype(str).to_numpy()
-                right_values = right.astype(str).str.removeprefix("tr__").to_numpy() if column == "sample_id" else right.astype(str).to_numpy()
-                equal = bool(np.array_equal(left_values, right_values))
+                equal = bool(np.array_equal(left.astype(str).to_numpy(), right.astype(str).to_numpy()))
             else:
                 equal = bool(np.array_equal(left.to_numpy(dtype=np.float64), right.to_numpy(dtype=np.float64)))
             ledger_same = ledger_same and equal
-        structural_clone = _namespace_frame(sparse_view.structural)
+        structural_clone = sparse_structural_input.copy()
         structural_same = True
-        for column in sparse_structural_namespaced.columns:
-            left = sparse_structural_namespaced[column]
+        for column in sparse_structural_input.columns:
+            left = sparse_structural_input[column]
             right = structural_clone[column]
             if left.dtype.kind in "OUS" or right.dtype.kind in "OUS":
                 equal = bool(np.array_equal(left.astype(str).to_numpy(), right.astype(str).to_numpy()))
@@ -1282,7 +1282,7 @@ def stage_matched_comparison(args: argparse.Namespace) -> None:
             "B_C_changed_features": changed_features,
             "C_interpretation": "retrospective dense historical covariate view; not deployable when those rows are unavailable",
         }
-        del full_booster, b_features, c_features, b_base, c_base, dense_source_namespaced, structural_clone
+        del full_booster, b_features, c_features, b_base, c_base, replay_input, sparse_source_input, sparse_structural_input, dense_source_input, structural_clone
         gc.collect()
 
         exposure_training = build_sampled_training_rows(
