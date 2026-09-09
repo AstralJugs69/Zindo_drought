@@ -9,6 +9,35 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
+## 2026-09-09 — frozen full-training B3/98 submission result
+
+The selected dense-history B3/98 control was fit once on Kaggle with the full
+supplied Train labels using commit
+`8fa8956e3a27da544f5954292ea5ff6bc44c9c22`, seed `20260908`, 98 rounds, 63
+leaves, and `min_data_in_leaf=1000`. The run used `1,976,942` legal sampled
+rows after excluding `177,079` missing-anchor rows and retained the 446-column
+schema. Its exact saved-D0 replay check matched within
+`4.440892098500626e-16`. The Test contract was enforced with 280,961 rows,
+94,048 visible TWS rows, 186,913 masked rows, no illegal-anchor exclusions,
+and no Test labels.
+
+The single generated output is
+`artifacts/b3_full_submission_20260909T010000Z/submission_b3_dense_history_98_5bc9e52.csv`
+(280,961 rows; SHA-256
+`62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c`). The
+remote run manifest records `status=completed` and `fit_count=1`; only the CSV
+and small manifests were retrieved locally, while the model and large ledgers
+remain remote.
+
+The authenticated Zindi account returned two successful rows with this exact
+filename: `1JLvpsYJ` (`2026-09-09T04:13:32.148Z`) and `38KHQMrj`
+(`2026-09-09T04:13:54.579Z`). Both public scores are `0.750207364`. The
+leaderboard showed `astraljugs` at rank 230 with four total submissions. The
+two-row duplicate state is recorded as observed; no third upload was issued.
+The public score is a leaderboard observation, not independent confirmation of
+generalization, and no further modeling or submission is authorized in this
+sequence.
+
 ## 2026-09-09 — covariate-history gap augmentation decision
 
 The predeclared follow-up tested whether B3/98 training exposure should mimic

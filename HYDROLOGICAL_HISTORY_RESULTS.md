@@ -12,6 +12,52 @@ to each runner's `--expected-commit`; the runner records it in its manifest.
 **Environment:** the repaired Kaggle checkout and experiment root are writable
 by `kaggle`; all fitting/scoring in this record is Kaggle-only.
 
+## 2026-09-09 — full-training B3/98 Test submission and Zindi result
+
+The authorized frozen deployment run used
+`scripts/run_b3_full_submission.py` on Kaggle from commit
+`8fa8956e3a27da544f5954292ea5ff6bc44c9c22`. It fit dense-history B3/98 once
+(`fit_count=1`, seed `20260908`, 98 rounds, 63 leaves,
+`min_data_in_leaf=1000`) on every legal supplied Train label. The run used
+`1,976,942` sampled legal rows, dropped `177,079` missing-anchor rows, and
+retained all horizons h=1..7. The final feature schema has 446 columns. The
+exact replay integration check passed on 278,447 rows with maximum prediction
+difference `4.440892098500626e-16` against the saved D0 model/OOF path.
+
+Test-time contract checks were completed without using Test labels. The
+competition visibility ledger contains 280,961 rows: 94,048 visible Test TWS
+rows and 186,913 masked rows, with no illegal-anchor exclusions or masked
+self-anchors. Batched inference used 20,000-row batches, produced finite
+predictions for every SampleSubmission ID, and generated exactly one local
+output file with no clipping or calibration:
+
+```text
+remote: /kaggle/working/drought_runs/b3_full_submission_20260909T010000Z/submission_b3_dense_history_98_5bc9e52.csv
+local:  artifacts/b3_full_submission_20260909T010000Z/submission_b3_dense_history_98_5bc9e52.csv
+rows:   280,961
+bytes:  11,110,853
+sha256: 62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c
+```
+
+The remote manifest is `status=completed`, `fit_count=1`, and records the same
+source commit and output SHA. Only the CSV and small manifests were copied to
+Windows; the model, visibility ledger, and other large training artifacts
+remain inspectable through `ssh kaggle`.
+
+### Zindi processing record
+
+The authenticated Zindi submissions API was checked on 2026-09-09. The account
+state contained **two** successful rows with this exact B3/98 filename rather
+than one: `1JLvpsYJ` at `2026-09-09T04:13:32.148Z` and `38KHQMrj` at
+`2026-09-09T04:13:54.579Z`. Both report public score `0.750207364` and
+`status=successful`; the platform metadata exposes the filename but not a
+payload SHA. The authenticated leaderboard shows `astraljugs` at rank **230**
+with public score `0.750207364` and four total submissions. This ledger records
+the duplicate platform state as observed and intentionally issued **no third
+upload**. The local/remote output SHA above is the reproducibility hash for the
+file associated with the run; the public leaderboard score is not independent
+generalization evidence.
+
 ## 2026-09-09 — deterministic covariate-history gap augmentation (final decision)
 
 This experiment asked whether B3/98 becomes more availability-faithful when its

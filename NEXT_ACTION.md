@@ -1,3 +1,35 @@
+# Next action — B3/98 full submission result recorded
+
+## 2026-09-09 — frozen full-training deployment
+
+- The one authorized full-training deployment run completed on Kaggle from
+  commit `8fa8956e3a27da544f5954292ea5ff6bc44c9c22` using the frozen dense
+  B3/98 recipe. It fit exactly once (`fit_count=1`) on 1,976,942 legal sampled
+  rows; the 446-column Test contract and exact replay integration check passed.
+- The generated file is
+  `artifacts/b3_full_submission_20260909T010000Z/submission_b3_dense_history_98_5bc9e52.csv`,
+  with 280,961 rows and SHA-256
+  `62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c`.
+  Only this CSV and small manifests were retrieved locally; large Kaggle
+  artifacts remain remote and are available through `ssh kaggle`.
+- The authenticated Zindi account currently shows two successful entries with
+  this same filename: IDs `1JLvpsYJ` (2026-09-09 04:13:32.148Z) and
+  `38KHQMrj` (2026-09-09 04:13:54.579Z). Both scored `0.750207364`; the
+  leaderboard shows rank 230 for `astraljugs` with four total submissions.
+  This duplicate platform state is recorded as observed; no additional upload
+  was attempted.
+
+## Safe continuation
+
+1. Treat the B3/98 public score as a completed leaderboard observation, not as
+   independent confirmation; do not fit another candidate or submit another
+   file under this campaign.
+2. Keep `/kaggle/working/drought_runs/b3_full_submission_20260909T010000Z/`
+   as the remote audit source and use `ssh kaggle` for inspection; do not copy
+   the model or large ledgers to Windows.
+3. If the Kaggle runtime rotates or restarts, reconnect through the `kaggle`
+   alias and verify the pinned commit/run manifest before any inspection.
+
 # Next action — covariate-gap decision closed
 
 ## 2026-09-09 — final augmentation checkpoint
