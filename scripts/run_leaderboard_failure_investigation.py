@@ -22,7 +22,6 @@ import gc
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -350,7 +349,6 @@ def stage_target_alignment(args: argparse.Namespace) -> None:
     try:
         train = _load_train(args.data_dir)
         joined, evidence = _next_calendar_alignment(train)
-        left = joined.loc[:, ["sample_id", "lat", "lon", "source_period", "target"]].copy()
         duplicate_keys = int(evidence["duplicate_location_month_rows"])
         matched = joined["next_calendar_TWS"].notna()
         difference = joined.loc[matched, "target"].to_numpy(dtype=np.float64) - joined.loc[matched, "next_calendar_TWS"].to_numpy(dtype=np.float64)
