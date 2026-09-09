@@ -1,8 +1,9 @@
 import json
 
+import numpy as np
 import pandas as pd
 
-from scripts.analyze_covariate_gap_augmentation import analyze
+from scripts.analyze_covariate_gap_augmentation import _metric, analyze
 
 
 def _run(root, origin, recipe, seed, weighted):
@@ -29,3 +30,19 @@ def test_inner_rejects_recipe_that_regresses_one_origin(tmp_path):
             path = tmp_path / f"{origin}_{recipe}_{seed}"; _run(path, origin, recipe, seed, metric); paths.append(path)
     report = analyze(paths)
     assert report["inner"]["selected_recipe"] is None
+
+
+def test_metric_reports_present_horizon_diagnostic_without_inventing_official_score():
+    frame = pd.DataFrame(
+        {
+            "h": [1, 2, 3, 5, 6, 7, 8],
+            "target": np.zeros(7),
+            "prediction": np.ones(7),
+        }
+    )
+    metric = _metric(frame)
+    assert metric["official_h1_7_weighted_rmse"] is None
+    assert metric["official_horizons_present"] == [1, 2, 3, 5, 6, 7]
+    assert metric["present_h1_7_weighted_rmse"] == 1.0
+    assert metric["present_horizon_weight_total"] < 1.0
+    assert metric["stress_h_gt7_rows"] == 1
