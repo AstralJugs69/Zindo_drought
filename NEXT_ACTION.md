@@ -1,5 +1,16 @@
 # Next action — B3/98 full submission result recorded
 
+## Current runtime state — 2026-09-09
+
+The Pinggy supervisor is reachable through `ssh kaggle` at the current
+generation, and the checkout is clean at commit `9fb9a5d`.  A live inventory
+after the runtime restart found `/kaggle/working/drought_runs/`, but did **not**
+find the saved full B3 model, the Dec-2014 D0 replay package, or the interrupted
+matched-comparison directory referenced below.  Those paths and metrics are
+historical evidence, not proof that the artifacts survived this restart.  Do
+not substitute an outer-fold model or retrain solely to recreate them; restore
+the exact saved artifacts before claiming the matched A/B/C diagnosis complete.
+
 ## 2026-09-09 — leaderboard root-cause investigation complete
 
 The read-only investigation is recorded in

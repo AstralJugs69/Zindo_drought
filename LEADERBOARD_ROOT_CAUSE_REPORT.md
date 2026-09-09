@@ -6,6 +6,14 @@
 **Submission:** `submission_b3_dense_history_98_5bc9e52.csv`, SHA-256
 `62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c`
 
+> **Current-runtime caveat (2026-09-09):** The live Kaggle runtime is reachable
+> through `ssh kaggle`, but its post-restart inventory does not contain the
+> saved full B3 model, the Dec-2014 D0 replay package, or the interrupted
+> matched-comparison run directory cited in this report.  The historical
+> results below remain recorded evidence; the matched A/B/C extension is not
+> currently reproducible until those exact artifacts are restored.  No
+> outer-fold substitute or retraining is authorized for this diagnosis.
+
 ## Executive conclusion
 
 The public result is not explained by a corrupt CSV, an ID/order mistake, a
