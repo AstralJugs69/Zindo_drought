@@ -619,6 +619,7 @@ def _tree_gain_groups(booster: Any, feature_names: list[str] | None = None) -> t
     dump = booster.dump_model()
     gains: dict[str, float] = {}
     counts: dict[str, int] = {}
+    leaf_counts: list[int] = []
 
     def family(name: str) -> str:
         lower = name.lower()
@@ -649,13 +650,29 @@ def _tree_gain_groups(booster: Any, feature_names: list[str] | None = None) -> t
             if isinstance(child, dict):
                 walk(child)
 
+    def leaves(node: dict[str, Any]) -> int:
+        left = node.get("left_child")
+        right = node.get("right_child")
+        if not isinstance(left, dict) and not isinstance(right, dict):
+            return 1
+        return (leaves(left) if isinstance(left, dict) else 0) + (leaves(right) if isinstance(right, dict) else 0)
+
     for tree in dump.get("tree_info", []):
         root = tree.get("tree_structure", {})
         if isinstance(root, dict):
             walk(root)
+            leaf_counts.append(leaves(root))
     total = sum(gains.values())
     table = pd.DataFrame([{"feature_group": key, "split_count": int(counts.get(key, 0)), "split_gain": float(value), "split_gain_share": (float(value) / total if total else None)} for key, value in sorted(gains.items(), key=lambda kv: (-kv[1], kv[0]))])
-    metadata = {"tree_count": int(len(dump.get("tree_info", []))), "total_split_gain": float(total), "num_leaves": int(dump.get("max_feature_idx", -1)) if False else None}
+    metadata = {
+        "tree_count": int(len(dump.get("tree_info", []))),
+        "total_split_gain": float(total),
+        "leaf_counts": leaf_counts,
+        "total_leaves": int(sum(leaf_counts)),
+        "mean_leaves": float(np.mean(leaf_counts)) if leaf_counts else None,
+        "min_leaves": int(min(leaf_counts)) if leaf_counts else None,
+        "max_leaves": int(max(leaf_counts)) if leaf_counts else None,
+    }
     return table, metadata
 
 
