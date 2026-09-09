@@ -9,7 +9,8 @@ upload to Zindi. The compact stage outputs remain remote under
 `/kaggle/working/drought_runs/leaderboard_failure_20260909T123000Z/` (integrity,
 target alignment/behaviour, and OOF decomposition),
 `leaderboard_failure_20260909T150000Z/` (saved-model fit, tree gains, and Test
-support), and `leaderboard_failure_20260909T160000Z/` (sample inference).
+support), `leaderboard_failure_20260909T160000Z/` (sample inference), and
+`leaderboard_failure_20260909T170000Z/` (independent tree metadata).
 
 Key reproducibility results:
 
@@ -23,6 +24,11 @@ Key reproducibility results:
   Test IDs matches the submitted file to `4.44e-16`. Batch sizes 1/17/257/1686,
   shuffled request order, all masked-TWS perturbations, and later-covariate
   causality checks have maximum difference `0.0`.
+- The saved booster has exactly 98 trees, each with 63 leaves (6,174 total;
+  min/mean/max `63 / 63.0 / 63`). Mapped split-gain shares are legal
+  TWS/history `38.957%`, regional context/support `31.758%`, local
+  hydro/trajectory `19.913%`, and geography/horizon `9.372%`; this is
+  descriptive structure, not causal attribution.
 
 Measured transfer evidence explains why the public result is lower than the
 pooled historical picture. Target-current RMSE in Train source months

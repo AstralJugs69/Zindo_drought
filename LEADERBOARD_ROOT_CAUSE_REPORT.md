@@ -33,7 +33,9 @@ or one geographic cell has been identified as the hidden leaderboard failure.
   `tests/test_leaderboard_failure_investigation.py`.
 - Completed stages use unique remote directories.  The target/integrity/OOF
   stages ran at commit `15a9624b5bce91f4de861e3d6a58be27d33e621b`; full-fit,
-  tree, and Test-support stages ran at `1b23897830dd88e1d7400b5a15583a7b44ac2183`;
+  and Test-support stages ran at `1b23897830dd88e1d7400b5a15583a7b44ac2183`;
+  the final tree metadata stage ran at
+  `f559243eef2a34fd68ea275d919f020cc440f2a2`;
   the final sample-inference stage ran at
   `0b8e6aabc9d49d529eeb6806e79e4e5b1721d5f5`.  These commits differ only in
   diagnostic code fixes; the saved model/data/configuration were unchanged.
@@ -220,6 +222,10 @@ against the saved configuration:
   `a1f1c08882676ca00d8fc613fe118d241ceadb2cf61db3ee5d0af6ffa6632c11`.
 - Rebuilt 446-feature schema hash is
   `ef2a7dbfb77c56b96d741e07a1b68a45ea6f9eabae00a41c929ea5b4bfb12a41`.
+- The independent tree-metadata pass finds exactly 98 trees, each with 63
+  leaves (6,174 leaves total; minimum/mean/maximum `63 / 63.0 / 63`).  The
+  parsed model reports total split gain `3,269,653.4463882446`; these values
+  are structural metadata, not a claim of causal importance.
 
 Scoring those rows without refitting gives in-sample B3 RMSE `0.535382`, MAE
 `0.393937`, bias `-0.000059`, versus persistence RMSE `0.686105`.  The gap from
@@ -243,6 +249,12 @@ The fit outputs are in
 `full_fit_details.json` (SHA-256
 `02dd693943767b3bc3b12cd85a26536168b9edbc0786cfe37c15a20b3ea24491`),
 `fit_by_source_month.csv`, `fit_by_geo5.csv`, `fit_late_2015_by_geo5.csv`, and
+`fit_tree_gain_groups.csv` (SHA-256
+`25daaba45b9166038507109a918e50046e63bd37c44557c9c26ceaa2e5c09169`).
+The leaf-count metadata is in
+`/kaggle/working/drought_runs/leaderboard_failure_20260909T170000Z/`:
+`tree_inspection_details.json` (SHA-256
+`2a2fe5b7cf98859724f8cb33fbb7406e2c0e9fdc3096ff3c6d36ed8b81525cbb`) and
 `fit_tree_gain_groups.csv` (SHA-256
 `25daaba45b9166038507109a918e50046e63bd37c44557c9c26ceaa2e5c09169`).
 
@@ -321,7 +333,9 @@ Completed compact outputs remain remote and are inspectable with `ssh kaggle`:
   integrity, exact alignment, target behaviour, cell concentration, OOF
   decomposition, and overlap tables.
 - `/kaggle/working/drought_runs/leaderboard_failure_20260909T150000Z/` —
-  full saved-model fit, tree gains, Test support, and recent-validation support.
+  full saved-model fit, Test support, and recent-validation support.
+- `/kaggle/working/drought_runs/leaderboard_failure_20260909T170000Z/` —
+  independent 98-tree leaf metadata and the mapped split-gain table.
 - `/kaggle/working/drought_runs/leaderboard_failure_20260909T160000Z/` —
   deterministic sample inference/invariance report.
 

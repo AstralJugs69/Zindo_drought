@@ -30,6 +30,11 @@ the Dec-2014 late fold is `0.809688/0.789549`; the full-model in-sample score
 is `0.535382`. Test covariates are finite and within Train ranges, while sparse
 Test source months and growing legal-anchor age reduce history support.
 
+The saved booster structure is also reproduced: 98 trees, 63 leaves per tree
+(6,174 total), with mapped split-gain shares of 38.957% legal TWS/history,
+31.758% regional context/support, 19.913% local hydro/trajectory, and 9.372%
+geography/horizon. These gains are descriptive rather than causal.
+
 This changes the plan gate: do not tune the public file or infer hidden labels.
 The one next experiment is a frozen late-prefix, Test-schedule-matched,
 recency-weighted B3/98 fit (prefix through source month 2015-06; held-out
