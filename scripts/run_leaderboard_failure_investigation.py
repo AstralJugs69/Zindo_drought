@@ -991,6 +991,17 @@ def _predict_batches(booster: Any, ledger: pd.DataFrame, source: pd.DataFrame, s
     return prediction
 
 
+def _predict_feature_batches(booster: Any, ledger: pd.DataFrame, features: pd.DataFrame, *, batch_size: int) -> np.ndarray:
+    """Predict an already-built matrix in chunks (no repeated keyed joins)."""
+    if len(ledger) != len(features):
+        raise ValueError("ledger and feature matrix lengths differ")
+    prediction = np.empty(len(ledger), dtype=np.float64)
+    for start_index in range(0, len(ledger), int(batch_size)):
+        stop_index = min(start_index + int(batch_size), len(ledger))
+        prediction[start_index:stop_index] = ledger.iloc[start_index:stop_index]["last_observed_TWS"].to_numpy(dtype=np.float64) + np.asarray(booster.predict(features.iloc[start_index:stop_index]), dtype=np.float64)
+    return prediction
+
+
 def _sample_test_ledger(ledger: pd.DataFrame, sample_size: int) -> pd.DataFrame:
     if sample_size < 1:
         raise ValueError("sample_size must be positive")
@@ -1024,7 +1035,10 @@ def stage_sample_inference(args: argparse.Namespace) -> None:
         maps = build_b3_feature_maps(combined_source)
         booster = lgb.Booster(model_file=str(model_path))
         sample = _sample_test_ledger(ledger, int(args.sample_size))
-        baseline_prediction = _predict_batches(booster, sample, combined_source, combined_structural, maps, batch_size=len(sample), feature_names=feature_names)
+        baseline_features = build_b3_matrix(sample, combined_source, combined_structural, maps)
+        if baseline_features.columns.tolist() != feature_names:
+            raise AssertionError("feature schema changed during baseline sample inference")
+        baseline_prediction = _predict_feature_batches(booster, sample, baseline_features, batch_size=len(sample))
         submission = pd.read_csv(args.submission.resolve(), usecols=["ID", "Target"]) if args.submission else None
         compare: dict[str, Any] = {"sample_rows": int(len(sample)), "sample_id_unique": int(sample["sample_id"].astype(str).nunique()), "sample_size_requested": int(args.sample_size)}
         if submission is not None:
@@ -1036,7 +1050,7 @@ def stage_sample_inference(args: argparse.Namespace) -> None:
 
         order_checks: list[dict[str, Any]] = []
         for batch_size in (1, 17, 257, min(4096, len(sample))):
-            pred = _predict_batches(booster, sample, combined_source, combined_structural, maps, batch_size=batch_size, feature_names=feature_names)
+            pred = _predict_feature_batches(booster, sample, baseline_features, batch_size=batch_size)
             order_checks.append({"batch_size": int(batch_size), "max_abs_difference": float(np.max(np.abs(pred - baseline_prediction)))})
         rng = np.random.default_rng(20260909)
         shuffled = sample.iloc[rng.permutation(len(sample))].reset_index(drop=True)
