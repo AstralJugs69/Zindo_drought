@@ -36,7 +36,12 @@ from src.ml_features import (
     horizon_rebalance_weights,
 )
 from src.neural_sequence import build_b3_feature_maps, build_b3_matrix
-from src.observation_simulator import ScenarioSpec, build_template_replay_fold, simulate_observations
+from src.observation_simulator import (
+    ScenarioSpec,
+    build_replay_observation_view,
+    build_template_replay_fold,
+    simulate_observations,
+)
 from src.regional_context import HYDRO_COLUMNS
 from src.validation import build_test_mask_template
 
@@ -190,9 +195,29 @@ def _validate_replay_path(
     fold = build_template_replay_fold(train_plain, template, start_month=REPLAY_ORIGIN,
                                       scenario_id="submission_integration_replay_2007_09",
                                       family="submission_integration")
+    # The saved D0 replay was trained/scored on the exact transported Test
+    # availability view, not on dense Train rows that happen to fall inside the
+    # replay window. Recreate that view before building maps; otherwise later
+    # Train observations would silently change causal trajectories.
+    view = build_replay_observation_view(
+        train_source.loc[:, SOURCE_HYDRO_HISTORY_COLUMNS].assign(
+            sample_id=train_source["sample_id"].astype(str).str.removeprefix("tr__")
+        ),
+        train_structural.loc[:, ["sample_id", "time", "lat", "lon", "TWS_t"]].assign(
+            sample_id=train_structural["sample_id"].astype(str).str.removeprefix("tr__")
+        ),
+        ledger=fold.ledger,
+        first_source_month=fold.spec.first_source_month,
+        last_source_month=fold.spec.last_source_month,
+    )
+    view_source = view.source.copy()
+    view_structural = view.structural.copy()
+    view_source["sample_id"] = _namespace("tr__", view_source["sample_id"])
+    view_structural["sample_id"] = _namespace("tr__", view_structural["sample_id"])
     ledger = fold.ledger.copy()
     ledger["sample_id"] = _namespace("tr__", ledger["sample_id"])
-    valid_x = build_b3_matrix(ledger, train_source, train_structural, train_maps)
+    view_maps = build_b3_feature_maps(view_source)
+    valid_x = build_b3_matrix(ledger, view_source, view_structural, view_maps)
     _assert_float32_or_missing(valid_x, "integration validation features")
 
     saved_manifest = json.loads(saved_manifest_path.read_text(encoding="utf-8"))
