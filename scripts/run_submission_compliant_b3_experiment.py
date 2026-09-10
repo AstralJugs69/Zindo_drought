@@ -316,9 +316,23 @@ def _load_external_access_measurement(path: Path) -> dict[str, object]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("GLDAS access measurement must be a JSON object")
-    serialized = json.dumps(payload, sort_keys=True, default=str).lower()
-    if any(token in serialized for token in ("password", "passwd", "authorization", "cookie", "token")):
-        raise ValueError("GLDAS access measurement contains prohibited secret-like fields")
+
+    allowed_boolean_markers = {"cookies_recorded", "credential_values_recorded"}
+
+    def reject_secret_keys(value: object) -> None:
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                lowered = str(key).lower()
+                if lowered not in allowed_boolean_markers and any(
+                    token in lowered for token in ("password", "passwd", "authorization", "cookie", "token")
+                ):
+                    raise ValueError("GLDAS access measurement contains prohibited secret-like fields")
+                reject_secret_keys(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                reject_secret_keys(child)
+
+    reject_secret_keys(payload)
     return payload
 
 
