@@ -179,7 +179,9 @@ def measure_sample(*, output_dir: Path, sample_url: str = SAMPLE_URL) -> dict[st
             netrc_mode_ok = (netrc_path.stat().st_mode & 0o077) == 0
             parsed_netrc = netrc_module.netrc(str(netrc_path))
             auth = parsed_netrc.authenticators(URS_HOST)
-            machine_present = auth is not None and all(value is not None for value in auth)
+            # ``account`` is optional in a netrc entry; login and password are
+            # the two values required for Earthdata Basic authentication.
+            machine_present = auth is not None and auth[0] is not None and auth[2] is not None
         except (OSError, netrc_module.NetrcParseError):
             auth = None
 
