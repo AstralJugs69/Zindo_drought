@@ -34,6 +34,7 @@ def test_external_access_record_uses_measurement_and_keeps_history() -> None:
     assert record["status"] == "blocked_http_401_netrc_get"
     assert record["sample_request"]["method"] == "GET"
     assert record["sample_request"]["http_status"] == 401
+    assert record["sample_request"]["content_type"] == "text/html; charset=utf-8"
     assert record["credentials_checked_without_exposure"]["netrc_present"] is True
     assert record["netcdf_verification"]["status"] == "not_run_http_error"
     assert record["historical_failure"] == HISTORICAL_EXTERNAL_ACCESS_FAILURE

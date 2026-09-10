@@ -221,7 +221,7 @@ HISTORICAL_EXTERNAL_ACCESS_FAILURE = {
 def _safe_measurement_text(value: object, *, default: str = "") -> str:
     text = str(value if value is not None else default).replace("\r", " ").replace("\n", " ").strip()
     lowered = text.lower()
-    if "://" in text or "=" in text or any(
+    if "://" in text or any(
         token in lowered for token in ("password", "passwd", "token", "cookie", "authorization")
     ):
         return "redacted_error"
