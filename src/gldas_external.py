@@ -78,7 +78,9 @@ def period_keys(values: Sequence[str | pd.Period | pd.Timestamp] | pd.Series) ->
 def _lookup_key(periods: np.ndarray, grid_i: np.ndarray, grid_j: np.ndarray) -> np.ndarray:
     # 2,000 exceeds the GLDAS longitude dimension; the period multiplier leaves
     # ample space for both grid indices and avoids Python tuple dictionaries.
-    return periods.astype(np.int64) * 1_000_000 + grid_i.astype(np.int64) * 2_000 + grid_j.astype(np.int64)
+    # 10,000,000 exceeds the complete 600 x 1,440 cell offset (1,201,439),
+    # so adjacent calendar months can never collide in the sorted key index.
+    return periods.astype(np.int64) * 10_000_000 + grid_i.astype(np.int64) * 2_000 + grid_j.astype(np.int64)
 
 
 def _axis_indices(

@@ -262,6 +262,15 @@ def acquire(
     grid_j = grid_j.astype(np.int16)
     periods = list(plan["periods"])
     opener = _build_earthdata_opener(netrc_path)
+    prior_months: dict[str, object] = {}
+    prior_manifest_path = output_dir / "manifest.json"
+    if prior_manifest_path.is_file():
+        try:
+            prior_payload = json.loads(prior_manifest_path.read_text(encoding="utf-8"))
+            if isinstance(prior_payload.get("months"), dict):
+                prior_months = dict(prior_payload["months"])
+        except (OSError, json.JSONDecodeError):
+            prior_months = {}
     manifest: dict[str, object] = {
         "status": "running",
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -283,7 +292,7 @@ def acquire(
         "test_labels_read": False,
         "test_predictions_written": False,
         "submission_written": False,
-        "months": {},
+        "months": prior_months,
         "python": sys.version,
         "platform": platform.platform(),
     }
