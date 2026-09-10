@@ -1,5 +1,52 @@
 # Next action — B3/98 full submission result recorded
 
+## 2026-09-10 — submission-compliant B3-C rebuild completed; GLDAS gate blocked
+
+The coordinate-free B3-C reference was rebuilt on the persistent `zindi-gcp`
+VM from source commit `958060ffca757c50c936d678bdaaca2533bae780` in tmux
+session `zindi` (12 LightGBM threads, frozen seed `20260908`, 98 rounds,
+63 leaves, `min_data_in_leaf=1000`).  The historical 446-column B3 builder is
+preserved for audit only; the new fitted model contract is an explicit ordered
+444-column allowlist that removes raw `lat` and `lon`.  Coordinates remain
+metadata-only for causal source indexing and hydrological regional/local
+aggregation.  No cell ID, coordinate encoding, spatial embedding, or learned
+location input is present in B3-C.  The allowlist and feature provenance are
+saved in `b3c_feature_audit.json` for every run review.
+
+The four required B3-C references completed (remote artifacts remain remote):
+
+| Origin | h1--7 raw RMSE | Weighted proxy |
+|---|---:|---:|
+| 2003-04 | 0.585218 | 0.585130 |
+| 2004-04 | 0.563164 | 0.563051 |
+| 2014-04 | 0.588990 | n/a (h=4 absent) |
+| 2014-12 | 0.803770 | 0.785391 |
+
+Run path:
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_submission_compliant_b3c_20260910_v1/`.
+It contains four saved B3-C models, four OOF ledgers, manifests, prefit
+causality/schema checks, timing, and no Test predictions or submissions.  The
+`/usr/bin/time -v` record reports 16:01.70 wall time, 26,356,236 kB maximum
+resident set, and exit status 0.  The optional in-process `psutil` sampler was
+not installed, so the external time record is the authoritative RAM evidence.
+
+The one permitted external intervention was not run.  An official
+GLDAS-2.1 Noah monthly 0.25-degree sample URL was checked: discovery/HEAD was
+available, but the first data GET without credentials returned HTTP 401.  No Earthdata token,
+`.netrc`, username, or credential file was present, no bulk acquisition began,
+and no substitute product was used.  The ten-feature GLDAS contract and exact
+causal/missingness rules are recorded in `external_access.json`; its status is
+`blocked_http_401_no_noninteractive_earthdata_credentials`.
+
+**Decision:** B3-C is the current submission-compliant reference; the
+historical coordinate-bearing B3 is explicitly unsuitable for a compliant
+submission.  The paired GLDAS inner gate is not evaluable while official data
+access is blocked, recent external candidates and optional 2009-01 were not
+run, and no further experiment is authorized in this sequence.  If a valid
+Earthdata credential is later supplied, re-run the single sample/access gate
+first rather than changing the feature contract or silently substituting a
+dataset.
+
 ## Current runtime state — 2026-09-10
 
 Execution has moved to the persistent CPU-only VM reached with `ssh zindi-gcp`.

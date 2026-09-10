@@ -9,6 +9,47 @@
 EXP005/EXP009/EXP010 records are retained as legacy references only; no new
 candidate is promoted under the corrected multi-scenario protocol.
 
+## 2026-09-10 — submission-compliant coordinate-free B3-C reference
+
+The first compliant rebuild is complete on `zindi-gcp` in the persistent
+`zindi` tmux session, from source commit
+`958060ffca757c50c936d678bdaaca2533bae780` on
+`codex/validation-rebuild`.  The frozen B3 causal builder still produces 446
+columns for historical reproducibility, but the fitted B3-C contract selects
+an explicit ordered 444-column allowlist and removes raw `lat` and `lon`.
+Coordinates are used only as indexing metadata for legal observed-hydrology
+regional/local aggregates; no coordinate, cell ID, coordinate encoding,
+spatial embedding, or learned location input reaches LightGBM.  The schema,
+provenance map, and policy are persisted in each run's `b3c_feature_audit.json`.
+The new schema has dedicated tests, and the full remote suite passed 69 tests.
+
+The B3-C references used the unchanged sampled IDs/labels/anchors/horizons/
+weights, seed `20260908`, 98 rounds, 63 leaves, `min_data_in_leaf=1000`, and
+12 threads.  Four remote fits completed under
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_submission_compliant_b3c_20260910_v1/`:
+2003-04 h1--7 raw RMSE `0.585218`, 2004-04 `0.563164`, 2014-04 `0.588990`
+(h=4 absent; no weighted proxy invented), and 2014-12 `0.803770` with
+weighted proxy `0.785391`.  The run's external `/usr/bin/time -v` record is
+16:01.70 wall time and 26,356,236 kB maximum resident set with exit status 0;
+large models/OOF files remain remote.  No Test labels, predictions,
+submission, calibration, ensemble, or upload was created.
+
+The one authorized external intervention was held at the required access
+gate.  An official GLDAS-2.1 Noah monthly 0.25-degree sample was discoverable,
+but its first data GET without credentials returned HTTP 401 and no noninteractive
+Earthdata credential mechanism was configured.  No bulk download or substitute
+dataset was attempted.  The exact ten-feature contract (four soil-water
+layers, SWE, canopy storage, current/anchor sums, current-minus-anchor, and
+exact previous-calendar-month delta), units, cutoff, and missingness rules are
+recorded in `external_access.json`; the external candidate is
+`blocked_before_bulk_acquisition`.
+
+**Decision:** B3-C is the submission-compliant reference.  Historical
+coordinate-bearing B3 remains a legacy diagnostic and is not suitable for a
+compliant submission.  The paired GLDAS inner gate is not evaluable without
+official data access, so recent external candidates and optional 2009-01 were
+not run; stop this sequence here and do not start a post-decision experiment.
+
 ## 2026-09-10 — execution host migrated to persistent GCP VM
 
 The active execution host is now the persistent CPU-only VM reached with
