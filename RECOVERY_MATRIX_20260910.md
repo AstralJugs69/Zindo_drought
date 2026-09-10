@@ -33,8 +33,9 @@ The minimum useful recovery state is complete: the VM, hash-matched inputs,
 isolated environment, non-training tests, frozen Sep-2007 parity, late D0,
 Train-only full B3, and matched A/B/C outputs are all present and inspectable
 through `ssh zindi-gcp` in tmux session `zindi`.  The matched result shows
-B/full-B3 and C/dense are identical on the same legal replay, so dense-versus-
-sparse covariates are not the measured cause of the gap.  The next recency-
-weighted late-prefix experiment remains only a predeclared recommendation and
-requires explicit authorization.  No reset to `origin` is permitted; the
-branch's intentional commits must be preserved.
+B/full-B3 and C/dense are identical because the intervention had
+`sparse_withheld_window_rows=0` and changed zero features.  Treat this as a
+no-treatment control, not evidence that sparse covariates cannot matter.  The
+bounded next diagnostic is the fixed 98-vs-392-round capacity comparison; the
+old undefined recency-weighted experiment is closed.  No reset to `origin` is
+permitted; the branch's intentional commits must be preserved.

@@ -32,13 +32,14 @@ are unavailable.
 This is a measured explanation of the gap, not a claim that one physical regime
 or one geographic cell has been identified as the hidden leaderboard failure.
 
-The current matched replay additionally rules out the dense-versus-sparse
-covariate view as the primary explanation: the full B3 model produced exactly
-the same predictions when replayed with the legal sparse source view and with
-the retrospective dense view.  The improvement from the late D0 model to the
-full B3 model is therefore a joint later-training-exposure/fitted-model effect,
-not a pure availability intervention; temporal transfer and support mismatch
-remain the leading actionable explanations.
+The current matched replay does **not** rule out sparse covariate effects.  Its
+B/C intervention is empty: `sparse_withheld_window_rows=0` and
+`B_C_changed_feature_count=0`, so the fixed full B3 model receives identical
+features in both views and naturally produces identical predictions.  It is a
+useful no-treatment control, not evidence that genuinely unavailable sparse
+covariates do not matter.  The A-to-B improvement remains a joint
+later-training-exposure/fitted-model effect; temporal transfer, support
+mismatch, and the possible 98-round capacity limit remain open hypotheses.
 
 ## Investigation contract and provenance
 
@@ -85,8 +86,11 @@ The saved D0 OOF reproduces as A within `4.440892098500626e-16`.  B and C use
 the same replay ledger and structural panel; their base features are equal,
 zero features changed, and their predictions/SSE are identical.  B uses
 2,122,894 sparse source rows while C sees 2,154,021 retrospective dense rows;
-the sparse withheld-window count is zero.  C is not a deployable view when
-those historical covariates are unavailable.
+the sparse withheld-window count is zero.  Therefore B/C is an intentionally
+empty sparse-versus-dense intervention: it validates feature/ledger identity
+for the no-withholding case but cannot estimate the effect of covariates that
+would actually be missing in a sparse deployment.  C is not a deployable view
+when those historical covariates are unavailable.
 
 | replay scope | rows (h1--7 / >7) | A D0 weighted / raw | B full sparse weighted / raw | C full dense weighted / raw | persistence weighted / raw |
 |---|---:|---:|---:|---:|---:|
@@ -109,9 +113,9 @@ SSE difference `1.8189894035458565e-12`, and maximum RMSE decomposition error
 `d7a84c3c1e7a957e80a36c5e372f71efd2d32bcdf8ea470cefd538194c83c192`.
 
 This paired result is diagnostic rather than a new leaderboard candidate.  It
-does not authorize the next recency-weighted late-prefix experiment; that
-experiment remains a single, predeclared recommendation and must be separately
-authorized before any training.
+does not authorize the old undefined recency-weighted experiment; that idea is
+closed.  A fixed 98-vs-392-round capacity comparison is now the bounded next
+diagnostic, and must not produce Test outputs or a submission.
 
 ## 1. Integrity and exact alignment
 
@@ -372,31 +376,31 @@ not interchangeable samples; none supports a claim of independent confirmation
 or a location-specific hidden failure.  The duplicate platform rows already
 recorded in `NEXT_ACTION.md` were not retried.
 
-## 7. Exactly one next experiment (not run here)
+## 7. Exactly one next experiment: capacity budget (bounded, not a grid)
 
-**Late-prefix, schedule-matched recency-weighted B3/98.**  Before execution,
-verify that the two-month target block below has not already influenced a model
-choice, then freeze this one recipe:
+The old undefined recency-weighted proposal is closed: July/August 2015 was
+already used as development evidence, so it is not an untouched confirmation.
+The bounded capacity test instead compares the unchanged D0-dense B3 recipe at
+**98 versus 392 boosting rounds**.  It uses the current corrected observation
+view, the same seed (`20260908`), learning rate, 63 leaves,
+`min_data_in_leaf=1000`, 446 features, sampled IDs, labels, anchors, and
+horizon weights.  Features are built once per origin and reused; there is no
+early stopping, feature/recency/depth/loss/neural/ensemble grid, Test
+prediction, calibration, or submission.
 
-1. Hold out Train source months **2015-07 and 2015-08** (targets Aug/Sep 2015)
-   and train only on the legal prefix through source month 2015-06.  Use the
-   same 446-column B3 feature contract, 63 leaves, 98 rounds, min-data-in-leaf
-   1000, seed, and horizon weights; no architecture or feature changes.
-2. Apply one predeclared recency weight that matches the observed Test
-   source-month/horizon support to the labelled prefix (normalised to mean one).
-   Derive weights from row counts/support only; use no Test TWS labels and do
-   not tune a grid.  Reproduce the Test-like calendar/visibility mask in the
-   held-out replay and report raw RMSE, official h1--h7 weighted RMSE, horizon,
-   anchor-age, and 5-degree-cell slices.
-3. Falsify the hypothesis and stop if the frozen recipe does not reduce raw
-   RMSE by at least `0.005` on **both** held-out source months, or if official
-   h1--h7 RMSE worsens by more than `0.005`, or if any availability/hash
-   invariant fails.  This is one development experiment, not a submission or
-   independent confirmation; no Test prediction file should be generated.
+The primary out-of-time origins are **2014-04** and **2014-12**, with training
+targets strictly before each origin.  Save iteration-98 and iteration-392
+models/OOFs, train and validation RMSE, monthly/horizon/5-degree-cell additive
+SSE summaries, exact identity hashes, and checkpoint drift against any
+independently recovered D0 control.  April's missing h=4 is reported as
+incomplete support; it is not imputed and does not block its raw comparison.
 
-This experiment directly tests the leading measured mechanism—late-period
-representativeness—while holding B3 information and capacity fixed.  It does
-not assume that the public labels can be reconstructed.
+Advance only if iteration 392 improves available raw h1--7 RMSE by at least
+`0.005` on both recent origins and has no more than `0.02` raw-RMSE regression
+on any recent source month with at least 1,000 rows.  If that passes, run one
+2009-01 transfer check and require no more than `0.005` h1--7 raw-RMSE
+regression.  Otherwise close the capacity hypothesis.  Any later full-data
+diagnostic remains Train-only and separately authorized.
 
 ## Artifact index and reproducibility
 
@@ -412,7 +416,9 @@ Current GCP compact outputs remain remote and are inspectable with
 - `/home/milli/zindi_drought_gcp/drought_runs/gcp_matched_comparison_20260910_v2/` —
   matched A/B/C details and compact tables.
 
-Historical compact outputs remain remote and are inspectable with `ssh kaggle`:
+Historical Kaggle paths are retained as provenance labels only.  Their
+post-restart artifacts were not independently recovered and are **not** claimed
+to remain accessible through `ssh kaggle`:
 
 - `/kaggle/working/drought_runs/leaderboard_failure_20260909T123000Z/` —
   integrity, exact alignment, target behaviour, cell concentration, OOF

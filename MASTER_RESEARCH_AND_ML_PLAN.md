@@ -34,9 +34,12 @@ full B3 with the legal sparse view (B) is `0.737579`, and full B3 with the
 retrospective dense view (C) is exactly equal to B.  Replay identity is exact,
 exposure counts are explicit, and additive cell-SSE checks pass to
 `1.82e-12`.  This rules out dense-versus-sparse covariate availability as the
-primary cause in this paired test; A-to-B remains a joint later-training-
-exposure/fitted-model comparison, so the actionable hypothesis is still late
-temporal transfer plus validation-support mismatch.  Full details are in
+paired test; A-to-B remains a joint later-training-exposure/fitted-model
+comparison, so the actionable hypothesis is still late temporal transfer plus
+validation-support mismatch, with the 98-round capacity question still open.
+Because `sparse_withheld_window_rows=0` and zero features changed, B=C is an
+empty no-treatment control—not evidence that sparse covariates cannot matter.
+Full details are in
 `LEADERBOARD_ROOT_CAUSE_REPORT.md` and the remote run directory.
 
 The persistent VM has 48 vCPUs.  Reproducibility runs remain capped at four

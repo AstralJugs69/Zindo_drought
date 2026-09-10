@@ -21,7 +21,13 @@ saved OOF within `4.44e-16`, exposure counts are recorded, and corrected cell
 SSE aggregation is conserved to `1.82e-12`.  The GCP booster is an environment-
 drift rebuild (LightGBM 4.7.0), not a byte-for-byte replacement for the
 historical Kaggle booster; row/label/weight hashes match the frozen contract.
+The B/C result is an empty no-withholding control (`sparse_withheld_window_rows=0`,
+zero changed features), not evidence that sparse covariates cannot matter.
 No Test labels, predictions, calibration, or submission were created.
+
+The old undefined recency-weighted follow-up is closed.  The single bounded
+next diagnostic is a fixed 98-vs-392-round B3 comparison at the 2014-04 and
+2014-12 out-of-time origins, with no Test output or submission.
 
 ## 2026-09-09 — leaderboard root-cause investigation complete
 
@@ -64,8 +70,10 @@ not already influenced a model choice before running it.
   `artifacts/b3_full_submission_20260909T010000Z/submission_b3_dense_history_98_5bc9e52.csv`,
   with 280,961 rows and SHA-256
   `62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c`.
-  Only this CSV and small manifests were retrieved locally; large Kaggle
-  artifacts remain remote and are available through `ssh kaggle`.
+  Only this CSV and small manifests were retrieved locally.  The large Kaggle
+  artifacts were not independently recovered after the runtime loss; the
+  historical path is retained as lost provenance, not as a live `ssh kaggle`
+  source.
 - The authenticated Zindi account currently shows two successful entries with
   this same filename: IDs `1JLvpsYJ` (2026-09-09 04:13:32.148Z) and
   `38KHQMrj` (2026-09-09 04:13:54.579Z). Both scored `0.750207364`; the
@@ -79,10 +87,11 @@ not already influenced a model choice before running it.
    independent confirmation; do not fit another candidate or submit another
    file under this campaign.
 2. Keep `/kaggle/working/drought_runs/b3_full_submission_20260909T010000Z/`
-   as the remote audit source and use `ssh kaggle` for inspection; do not copy
-   the model or large ledgers to Windows.
-3. If the Kaggle runtime rotates or restarts, reconnect through the `kaggle`
-   alias and verify the pinned commit/run manifest before any inspection.
+   as the historical audit path only; its post-restart contents are lost unless
+   independently recovered.  Use `ssh zindi-gcp` for current artifacts and do
+   not copy the model or large ledgers to Windows.
+3. Do not reconnect to Kaggle for this campaign; current work stays on the
+   persistent `zindi-gcp` VM in tmux session `zindi`.
 
 # Next action — covariate-gap decision closed
 
@@ -109,18 +118,19 @@ not already influenced a model choice before running it.
 - Source and artifacts are pinned in `HYDROLOGICAL_HISTORY_RESULTS.md`.
   The final remote checkout is clean at
   `8154633d450ed9ca76b038f7c72b23ccc0cef621`; analysis JSONs remain under
-  `/kaggle/working/drought_runs/` and are inspectable through `ssh kaggle`.
+  `/kaggle/working/drought_runs/`; those post-restart artifacts were not
+  independently recovered and the path is retained as lost provenance.
 
 ## Safe continuation
 
-1. Treat B3/98 as the current strongest verified development baseline.
-2. If work resumes, first identify and verify a genuinely unused confirmation
-   period, freeze any independently motivated hypothesis and metric gate, and
-   evaluate once on Kaggle. Do not use the four replay origins above as
-   independent confirmation.
-3. If the Kaggle runtime restarts, reconnect with `ssh kaggle`, verify the
-   remote checkout and `drought_runs`, and never assume an endpoint change is a
-   key or repository problem.
+1. Treat B3/98 as the current strongest verified development baseline while
+   the bounded capacity diagnostic is evaluated.
+2. If work resumes after that diagnostic, first identify and verify a genuinely
+   unused confirmation period, freeze any independently motivated hypothesis
+   and metric gate, and evaluate once on `zindi-gcp`. Do not use the four
+   replay origins above as independent confirmation.
+3. Do not treat the lost Kaggle runtime as a current artifact source; current
+   work stays on the persistent `zindi-gcp` VM and its `zindi` tmux session.
 
 # Next action — compact neural sequence comparison closed
 
@@ -130,7 +140,7 @@ not already influenced a model choice before running it.
 - The outer two-seed GRU is worse than B3/98 on 2007-09, 2009-01, and 2014-04; its all-outer raw delta is +0.018143. It helps only at 2014-12 (-0.005213), which is inadequate for promotion. The predeclared equal blend is also adverse overall (+0.002334). Retain **B3/98** as strongest verified development baseline; do not generate Test predictions or a submission from any neural candidate.
 - The inner history ablation confirms older lawful sequence slots carry some signal (+0.005503 RMSE when hidden), but not enough to beat B3. This is a direction decision, not a claim that history is useless.
 - The outer runner had a documented cgroup OOM on its final origin. Valid per-fit OOFs were retained and only 2014-12 was resumed after a sequential-memory repair. The paired recovered analysis, stability check, and ablation completed remotely. See `HYDROLOGICAL_HISTORY_RESULTS.md` for exact paths, hashes, and limits.
-- Source commit for the metric follow-up analyzer: `c00687d4ae9506f37090fa85d413de3d8d02ad26`; `python -m pytest -q` passed 43 tests. Remote outputs remain under `/kaggle/working/drought_runs/`; do not download them merely for inspection.
+- Source commit for the metric follow-up analyzer: `c00687d4ae9506f37090fa85d413de3d8d02ad26`; `python -m pytest -q` passed 43 tests. The historical outputs under `/kaggle/working/drought_runs/` were not independently recovered after restart; do not treat them as live or download them merely for inspection.
 - No neural follow-up is justified without a new independently motivated, availability-faithful hypothesis. A future confirmation must first verify a genuinely unused period and freeze its recipe before one evaluation.
 
 # Earlier checkpoint — availability-faithful neural sequence comparison
