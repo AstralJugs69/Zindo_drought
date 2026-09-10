@@ -1,8 +1,8 @@
 """Build the submission-compliant B3-C reference on the remote worker.
 
 This runner deliberately fits only the coordinate-free B3-C reference.  The
-single GLDAS-2.1 Noah augmentation is represented in the manifest as blocked
-when the official sample GET cannot authenticate; no substitute dataset or
+single GLDAS-2.1 Noah augmentation is gated by a separately measured,
+sanitized sample-GET record; no stale access constant, substitute dataset, or
 partial external fit is silently introduced.  Test geometry is used only for
 label-free replay construction.  No Test predictions, submissions, uploads,
 calibration, ensembles, or post-decision experiments are created.
@@ -10,6 +10,7 @@ calibration, ensembles, or post-decision experiments are created.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from datetime import datetime, timezone
 import gc
 import hashlib
@@ -77,6 +78,10 @@ GLDAS_SAMPLE_URL = (
     "GLDAS_NOAH025_M.A201404.021.nc4"
 )
 GLDAS_METADATA_URL = "https://disc.gsfc.nasa.gov/datasets/GLDAS_NOAH025_M_2.1/summary"
+GLDAS_README_URL = (
+    "https://hydro1.gesdisc.eosdis.nasa.gov/data/GLDAS/GLDAS_NOAH025_M.2.1/doc/"
+    "README_GLDAS2.pdf"
+)
 GLDAS_VARIABLES = {
     "soil_moisture_0_10cm": {"source": "SoilMoi0_10cm_inst", "units": "kg m-2"},
     "soil_moisture_10_40cm": {"source": "SoilMoi10_40cm_inst", "units": "kg m-2"},
@@ -196,26 +201,103 @@ def _prefit_contract_checks() -> dict[str, object]:
     }
 
 
-def _external_access_record() -> dict[str, object]:
-    """Record the one official sample request without retrying with substitutes."""
+HISTORICAL_EXTERNAL_ACCESS_FAILURE = {
+    "status": "blocked_http_401_no_noninteractive_earthdata_credentials",
+    "source": "gcp_submission_compliant_b3c_20260910_v1/external_access.json",
+    "sample_request": "HEAD returned 200; authenticated GET returned HTTP 401",
+    "credentials_checked_without_exposure": {
+        "netrc": False,
+        "earthdata_token": False,
+        "earthdata_username": False,
+        "earthdata_config": False,
+    },
+    "bulk_acquisition_started": False,
+    "substitute_dataset_used": False,
+    "external_fit_started": False,
+    "decision": "stop_external_acquisition_and_finish_b3c_stage1",
+}
+
+
+def _safe_measurement_text(value: object, *, default: str = "") -> str:
+    text = str(value if value is not None else default).replace("\r", " ").replace("\n", " ").strip()
+    lowered = text.lower()
+    if "://" in text or "=" in text or any(
+        token in lowered for token in ("password", "passwd", "token", "cookie", "authorization")
+    ):
+        return "redacted_error"
+    return text[:160]
+
+
+def _external_access_record(measured: Mapping[str, object]) -> dict[str, object]:
+    """Record measured sample access while retaining the prior result as history.
+
+    Only a strict allowlist of probe fields is copied.  This prevents a future
+    probe implementation from accidentally persisting credentials, cookies,
+    response bodies, or redirect query parameters in the experiment record.
+    """
+    if not isinstance(measured, Mapping):
+        raise TypeError("measured GLDAS access result must be a mapping")
+    status = _safe_measurement_text(measured.get("status"), default="measurement_missing")
+    if not status or status == "measurement_missing":
+        raise ValueError("measured GLDAS access result has no status")
+    credentials = measured.get("credentials", {})
+    if not isinstance(credentials, Mapping):
+        credentials = {}
+    verification = measured.get("netcdf_verification", {})
+    if not isinstance(verification, Mapping):
+        verification = {"status": _safe_measurement_text(verification)}
+    safe_verification: dict[str, object] = {
+        "status": _safe_measurement_text(verification.get("status"), default="not_run"),
+    }
+    for key in (
+        "file_format", "magic", "product", "sample_month", "bytes", "dimensions",
+        "time_months", "variable_units", "variable_shapes", "product_marker_attribute_names",
+    ):
+        if key in verification:
+            value = verification[key]
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                safe_verification[key] = value
+            elif isinstance(value, (list, tuple)):
+                safe_verification[key] = list(value)
+            elif isinstance(value, Mapping):
+                safe_verification[key] = dict(value)
     return {
-        "status": "blocked_http_401_no_noninteractive_earthdata_credentials",
+        "status": status,
         "dataset": "GLDAS_NOAH025_M.2.1",
         "product": "GLDAS-2.1 Noah monthly 0.25-degree main production",
         "sample_url": GLDAS_SAMPLE_URL,
         "metadata_url": GLDAS_METADATA_URL,
+        "readme_url": GLDAS_README_URL,
         "sample_month": "2014-04",
-        "sample_request": "HEAD returned 200; authenticated GET returned HTTP 401",
-        "credentials_checked_without_exposure": {
-            "netrc": False,
-            "earthdata_token": False,
-            "earthdata_username": False,
-            "earthdata_config": False,
+        "sample_request": {
+            "method": "GET",
+            "redirect_policy": "HTTPS-only",
+            "tls_verification": "default_secure_verification",
+            "http_status": measured.get("http_status"),
+            "final_host": _safe_measurement_text(measured.get("final_host")),
+            "content_type": _safe_measurement_text(measured.get("content_type")),
+            "sanitized_error": _safe_measurement_text(measured.get("sanitized_error")),
         },
+        "credentials_checked_without_exposure": {
+            "netrc_present": bool(measured.get("netrc_present", credentials.get("netrc_present", False))),
+            "netrc_permissions_ok": bool(measured.get("netrc_permissions_ok", credentials.get("netrc_permissions_ok", False))),
+            "netrc_machine_present": bool(measured.get("netrc_machine_present", credentials.get("netrc_machine_present", False))),
+            "credential_values_recorded": False,
+            "cookies_recorded": False,
+        },
+        "sample_file_retained": bool(measured.get("sample_file_retained", False)),
+        "netcdf_verification": safe_verification,
         "bulk_acquisition_started": False,
         "substitute_dataset_used": False,
         "external_fit_started": False,
-        "decision": "stop_external_acquisition_and_finish_b3c_stage1",
+        "product_gate": {
+            "status": "documented_historical_proxy_eligible",
+            "basis": "Official GLDAS-2.1 documentation covers the archive from 2000 onward; challenge periods are historical, so archived monthly data are a documented historical proxy. Main-production latency does not invalidate already archived months.",
+            "grace_assimilation": "not_used; GLDAS-2.2/GRACE-derived products remain excluded",
+            "sample_verification_required_before_bulk": True,
+            "official_sources": [GLDAS_README_URL, GLDAS_METADATA_URL],
+        },
+        "historical_failure": HISTORICAL_EXTERNAL_ACCESS_FAILURE,
         "variables": GLDAS_VARIABLES,
         "feature_contract": list(GLDAS_EXTERNAL_FEATURES),
         "causal_rules": {
@@ -227,6 +309,17 @@ def _external_access_record() -> dict[str, object]:
             "coordinates": "sampling/indexing metadata only; never model inputs",
         },
     }
+
+
+def _load_external_access_measurement(path: Path) -> dict[str, object]:
+    """Load only a JSON probe result; reject files that look like secret dumps."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("GLDAS access measurement must be a JSON object")
+    serialized = json.dumps(payload, sort_keys=True, default=str).lower()
+    if any(token in serialized for token in ("password", "passwd", "authorization", "cookie", "token")):
+        raise ValueError("GLDAS access measurement contains prohibited secret-like fields")
+    return payload
 
 
 def _run_origin(
@@ -386,6 +479,12 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)
+    parser.add_argument(
+        "--external-access-measurement",
+        type=Path,
+        required=True,
+        help="sanitized JSON emitted by probe_gldas_access.py; no secret fields permitted",
+    )
     parser.add_argument("--num-threads", type=int, default=DEFAULT_NUM_THREADS)
     args = parser.parse_args()
     if args.output_dir.exists():
@@ -396,6 +495,11 @@ def main() -> None:
         raise RuntimeError({"expected_commit": args.expected_commit, "actual_commit": head})
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip():
         raise RuntimeError("refusing to run from a dirty checkout")
+    if not args.external_access_measurement.is_file():
+        raise FileNotFoundError(args.external_access_measurement)
+    external_access = _external_access_record(
+        _load_external_access_measurement(args.external_access_measurement)
+    )
     available_cpus = os.cpu_count() or 1
     if args.num_threads < 1 or args.num_threads > MAX_NUM_THREADS:
         raise ValueError(f"--num-threads must be in [1, {MAX_NUM_THREADS}]")
@@ -445,7 +549,6 @@ def main() -> None:
         prefit = _prefit_contract_checks()
         _atomic_json(args.output_dir / "prefit_checks.json", prefit)
         write_coordinate_free_b3_audit(args.output_dir / "b3c_feature_audit.json")
-        external_access = _external_access_record()
         _atomic_json(args.output_dir / "external_access.json", external_access)
         manifest.update({
             "prefit_checks": prefit,
