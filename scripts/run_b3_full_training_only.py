@@ -196,6 +196,7 @@ def main() -> None:
             raise AssertionError(f"Frozen B3 schema must contain 446 features, found {len(feature_names)}")
         feature_schema = {"feature_count": len(feature_names), "feature_names": feature_names, "dtype": "float32",
                           "missing_values_allowed": True, "schema_sha256": _hash_text(feature_names)}
+        _json(output_dir / "feature_schema.json", feature_schema)
         params = dict(DEFAULT_PARAMS, num_leaves=NUM_LEAVES, min_data_in_leaf=MIN_DATA_IN_LEAF,
                       num_threads=min(4, os.cpu_count() or 1), seed=SEED, feature_fraction_seed=SEED,
                       bagging_seed=SEED, data_random_seed=SEED)
@@ -211,7 +212,9 @@ def main() -> None:
                          "elapsed_seconds": time.perf_counter() - started, "fit_seconds": time.perf_counter() - fit_started,
                          "fit_count": 1, "feature_schema": feature_schema,
                          "model": {"path": str(model_path), "bytes": int(model_path.stat().st_size), "sha256": _sha256(model_path)},
-                         "output_checksums": {"model.txt": _sha256(model_path), "resolved_config.json": _sha256(output_dir / "resolved_config.json")}})
+                         "output_checksums": {"model.txt": _sha256(model_path),
+                                              "feature_schema.json": _sha256(output_dir / "feature_schema.json"),
+                                              "resolved_config.json": _sha256(output_dir / "resolved_config.json")}})
         _json(output_dir / "manifest.json", manifest)
         package = Path(shutil.make_archive(str(output_dir), "zip", root_dir=output_dir))
         manifest["package"] = {"path": str(package), "bytes": int(package.stat().st_size), "sha256": _sha256(package)}
