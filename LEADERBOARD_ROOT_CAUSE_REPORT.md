@@ -26,8 +26,9 @@ the target process and (2) historical validation that gives far more weight to
 older, easier periods than the 2015--2018 Test support.  Sparse legal history
 and anchor age are an additional transfer stressor, but the safe B3 feature
 contract is internally reproducible and Test covariates remain inside the Train
-ranges.  The exact hidden-Test error cannot be decomposed because Test labels
-are unavailable.
+ranges.  The fixed 98-vs-392 capacity check is now complete and fails its
+two-origin gate, so extra rounds are not an isolated explanation.  The exact
+hidden-Test error cannot be decomposed because Test labels are unavailable.
 
 This is a measured explanation of the gap, not a claim that one physical regime
 or one geographic cell has been identified as the hidden leaderboard failure.
@@ -39,7 +40,8 @@ features in both views and naturally produces identical predictions.  It is a
 useful no-treatment control, not evidence that genuinely unavailable sparse
 covariates do not matter.  The A-to-B improvement remains a joint
 later-training-exposure/fitted-model effect; temporal transfer, support
-mismatch, and the possible 98-round capacity limit remain open hypotheses.
+mismatch remain the actionable hypotheses; the fixed capacity comparison did
+not pass its two-origin gate.
 
 ## Investigation contract and provenance
 
@@ -114,8 +116,8 @@ SSE difference `1.8189894035458565e-12`, and maximum RMSE decomposition error
 
 This paired result is diagnostic rather than a new leaderboard candidate.  It
 does not authorize the old undefined recency-weighted experiment; that idea is
-closed.  A fixed 98-vs-392-round capacity comparison is now the bounded next
-diagnostic, and must not produce Test outputs or a submission.
+closed.  The fixed 98-vs-392-round capacity comparison is now complete and did
+not pass its recent-origin gate; it produced no Test outputs or submission.
 
 ## 1. Integrity and exact alignment
 
@@ -368,7 +370,7 @@ The compact support tables are
 | 2 | Validation support is unrepresentative: older dense/overlapping folds dominate pooled metrics, while Test has sparse months and growing anchor age | Exact Test h mix and legal ledger; history counts/anchor ages vary; outer pooled h1-7 `0.583339` and older origins dominate row count; overlap is measured | B3 safe feature contract and invariance tests pass; support shift alone cannot quantify hidden error | **Supported contributor** |
 3 | Export/ID/order or hidden-TWS leakage defect | None after exact hashes, ID joins, replay, masked perturbation, shuffled/batch checks | These tests do not prove every possible numerical bug | **Contradicted for the tested paths** |
 4 | Supplied Train target is a row-shift or duplicate-location corruption | Exact next-calendar join, zero duplicate location-month keys, zero matched differences | Terminal rows naturally lack a next row; external upstream revisions were not independently audited | **Not supported** |
-5 | Pure capacity or post-export calibration is the main cause | Full fit is optimistic; tree relies heavily on anchor/history | Same frozen model beats persistence in every measured late slice; no safe global correction can explain centered 2015 variability; no calibration was fit | **Possible mechanism, not isolated** |
+5 | Pure capacity or post-export calibration is the main cause | Full fit is optimistic; tree relies heavily on anchor/history | Fixed 98-vs-392 comparison improves incomplete April but worsens complete December; no safe global correction can explain centered 2015 variability; no calibration was fit | **Capacity gate failed; not isolated** |
 
 The public score (`0.750207364`) is a hidden-label Test observation.  Earlier
 ledgered public scores (`0.75789118` and `0.753313479`) and the OOF values are
@@ -376,31 +378,36 @@ not interchangeable samples; none supports a claim of independent confirmation
 or a location-specific hidden failure.  The duplicate platform rows already
 recorded in `NEXT_ACTION.md` were not retried.
 
-## 7. Exactly one next experiment: capacity budget (bounded, not a grid)
+## 7. Capacity budget result (bounded comparison completed)
 
 The old undefined recency-weighted proposal is closed: July/August 2015 was
 already used as development evidence, so it is not an untouched confirmation.
-The bounded capacity test instead compares the unchanged D0-dense B3 recipe at
-**98 versus 392 boosting rounds**.  It uses the current corrected observation
-view, the same seed (`20260908`), learning rate, 63 leaves,
-`min_data_in_leaf=1000`, 446 features, sampled IDs, labels, anchors, and
-horizon weights.  Features are built once per origin and reused; there is no
-early stopping, feature/recency/depth/loss/neural/ensemble grid, Test
+The bounded capacity test compared the unchanged D0-dense B3 recipe at **98
+versus 392 boosting rounds** using the same seed (`20260908`), learning rate,
+63 leaves, `min_data_in_leaf=1000`, 446 features, sampled IDs, labels, anchors,
+and horizon weights.  Features were built once per origin and reused; there
+was no early stopping, feature/recency/depth/loss/neural/ensemble grid, Test
 prediction, calibration, or submission.
 
-The primary out-of-time origins are **2014-04** and **2014-12**, with training
-targets strictly before each origin.  Save iteration-98 and iteration-392
-models/OOFs, train and validation RMSE, monthly/horizon/5-degree-cell additive
-SSE summaries, exact identity hashes, and checkpoint drift against any
-independently recovered D0 control.  April's missing h=4 is reported as
-incomplete support; it is not imputed and does not block its raw comparison.
+The primary out-of-time origins were **2014-04** and **2014-12**, with training
+targets strictly before each origin.  The run saved both checkpoints, OOFs,
+train/validation RMSE, monthly/horizon/5-degree-cell additive SSE summaries,
+identity hashes, and Dec-2014 D0 checkpoint drift.  April's missing h=4 was
+reported as incomplete support and not imputed.
 
-Advance only if iteration 392 improves available raw h1--7 RMSE by at least
-`0.005` on both recent origins and has no more than `0.02` raw-RMSE regression
-on any recent source month with at least 1,000 rows.  If that passes, run one
-2009-01 transfer check and require no more than `0.005` h1--7 raw-RMSE
-regression.  Otherwise close the capacity hypothesis.  Any later full-data
-diagnostic remains Train-only and separately authorized.
+| origin | iter98 h1--7 raw | iter392 h1--7 raw | delta (392−98) | gate |
+|---|---:|---:|---:|---|
+| 2014-04 | 0.581798 | 0.567687 | −0.014111 | pass (incomplete h=4 support) |
+| 2014-12 | 0.809378 | 0.814031 | +0.004654 | fail |
+
+The recent gate required at least `0.005` improvement on both origins and no
+more than `0.02` raw-RMSE regression on any recent source month with at least
+1,000 rows.  Monthly regressions stayed below the latter threshold (largest
+`+0.019283` in June 2015), but the December origin failed, so
+`recent_gate_pass=false` and the optional 2009-01 transfer check was not run.
+**Decision:** close extra rounds as a standalone explanation and retain B3/98;
+full results are in `CAPACITY_BOTTLENECK_RESULTS.md` and the remote run
+directory below.
 
 ## Artifact index and reproducibility
 
@@ -415,6 +422,9 @@ Current GCP compact outputs remain remote and are inspectable with
   Train-only full B3 model, schema, and manifest.
 - `/home/milli/zindi_drought_gcp/drought_runs/gcp_matched_comparison_20260910_v2/` —
   matched A/B/C details and compact tables.
+- `/home/milli/zindi_drought_gcp/drought_runs/gcp_b3_capacity_20260910/` —
+  completed 98-vs-392 comparison, gate, OOF/model checkpoints, and additive
+  monthly/horizon/geo5 tables.
 
 Historical Kaggle paths are retained as provenance labels only.  Their
 post-restart artifacts were not independently recovered and are **not** claimed

@@ -13,8 +13,8 @@ candidate is promoted under the corrected multi-scenario protocol.
 
 The active execution host is now the persistent CPU-only VM reached with
 `ssh zindi-gcp`, not Kaggle/Pinggy.  The user-owned checkout is
-`/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at commit
-`71d7e89`.  Long-running work must run in
+`/home/milli/zindi_drought_gcp` on `codex/validation-rebuild`; the capacity run
+was launched from source commit `a44bf70`.  Long-running work must run in
 tmux session `zindi`, whose shell is logged with
 `script -af /home/milli/zindi-session.log`; see `GCP_MIGRATION_RUNBOOK.md`.
 
@@ -36,17 +36,35 @@ exposure counts are explicit, and additive cell-SSE checks pass to
 `1.82e-12`.  This rules out dense-versus-sparse covariate availability as the
 paired test; A-to-B remains a joint later-training-exposure/fitted-model
 comparison, so the actionable hypothesis is still late temporal transfer plus
-validation-support mismatch, with the 98-round capacity question still open.
+validation-support mismatch; the fixed 98-vs-392 capacity check is now complete
+and did not pass its recent-origin gate.
 Because `sparse_withheld_window_rows=0` and zero features changed, B=C is an
 empty no-treatment control—not evidence that sparse covariates cannot matter.
 Full details are in
 `LEADERBOARD_ROOT_CAUSE_REPORT.md` and the remote run directory.
 
-The persistent VM has 48 vCPUs.  Reproducibility runs remain capped at four
-threads; the Train-only runner exposes a bounded `--num-threads 1..24` option
-for separately authorized 12/24-thread benchmarks, with the effective value
-recorded in each manifest.  No current diagnostic was rerun at a higher
-thread count.
+The persistent VM has 48 vCPUs.  The default LightGBM execution policy is now
+12 threads, with 24 as an explicitly authorized upper benchmark; effective
+values are recorded in each manifest.  Do not run two high-thread jobs
+concurrently, and keep the persistent `zindi` tmux/logger path intact.
+
+## 2026-09-10 — capacity bottleneck decision
+
+The fixed B3 capacity comparison is complete on `zindi-gcp` from commit
+`a44bf7053b187133f5d26aea4b44fe03aef13ef4`.  One 392-round fit per recent
+origin was scored at iterations 98 and 392 on identical 446-feature,
+availability-faithful rows.  April improved by `0.014111` raw h1--7 RMSE, but
+December worsened by `0.004654` (weighted `0.789549 -> 0.791794`).  Because the
+gate required improvement on both recent origins, `recent_gate_pass=false` and
+the optional 2009-01 transfer check was not run.  April h=4 is absent and was
+not imputed; the December replay is complete.
+
+**Decision:** close extra boosting rounds as a standalone explanation and
+retain B3/98.  Continue only with a separately authorized representation or
+transfer hypothesis; do not launch a larger capacity grid or create Test
+predictions/submissions.  Full tables, hashes, and remote paths are in
+`CAPACITY_BOTTLENECK_RESULTS.md` and
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_b3_capacity_20260910/`.
 
 ## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
 
@@ -75,13 +93,11 @@ The saved booster structure is also reproduced: 98 trees, 63 leaves per tree
 geography/horizon. These gains are descriptive rather than causal.
 
 This changes the plan gate: do not tune the public file or infer hidden labels.
-The one next experiment is a frozen late-prefix, Test-schedule-matched,
-recency-weighted B3/98 fit (prefix through source month 2015-06; held-out
-2015-07/08 targets; unchanged 446 features and capacity; one predeclared
-Test-support-derived weight). Falsify at a `0.005` two-month improvement gate,
-the official h1--7 degradation gate, or any availability/hash failure. Verify
-the held-out block has not influenced prior choices, run once on Kaggle, and do
-not create a Test prediction or submission from this diagnostic branch.
+The recency-weighted paragraph above is a historical proposal and is now
+closed; July/August 2015 was already development evidence.  The replacement
+capacity check is recorded in the 2026-09-10 section above and in
+`CAPACITY_BOTTLENECK_RESULTS.md`; it failed the two-origin gate.  Do not launch
+another capacity grid or create a Test prediction/submission from this branch.
 
 ## 2026-09-09 — frozen full-training B3/98 submission result
 

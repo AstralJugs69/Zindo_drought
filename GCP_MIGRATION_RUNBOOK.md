@@ -19,7 +19,7 @@ The checkout is `/home/milli/zindi_drought_gcp` and the isolated interpreter is
 
 ```bash
 cd /home/milli/zindi_drought_gcp
-export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 MKL_NUM_THREADS=4 NUMEXPR_NUM_THREADS=4
+export OMP_NUM_THREADS=12 OPENBLAS_NUM_THREADS=12 MKL_NUM_THREADS=12 NUMEXPR_NUM_THREADS=12
 ```
 
 Do not run model fitting or scoring from the Windows checkout.  Do not invoke a
@@ -30,8 +30,8 @@ CPU-only; no GPU/neural campaign is planned.
 
 The VM reported Ubuntu 22.04, 48 vCPUs, about 62 GiB RAM, and about 192 GiB
 free on the 194 GiB root disk.  The checkout is on
-`codex/validation-rebuild` at `71d7e89` after the diagnostic runner's schema
-persistence and report updates, with no tracked changes.  The completed
+`codex/validation-rebuild`; the capacity comparison was launched from source
+commit `a44bf70`.  The completed
 recovery diagnostics were launched at the preceding clean commit
 `7e44744739065dfd6bf7a5e53ae3af28b3b79450`.
 
@@ -77,6 +77,9 @@ diagnostic state has now been rebuilt in three unique directories:
 - `drought_runs/gcp_matched_comparison_20260910_v2` — completed matched A/B/C
   compact outputs; details SHA-256
   `764f7fe16dda19976126dd4eb0bdb3ff3a1bf49a60d933c708ecee94435ec9dc`.
+- `drought_runs/gcp_b3_capacity_20260910` — completed 98-vs-392-round B3
+  capacity comparison; the recent-origin gate failed because December
+  regressed, so no 2009-01 transfer check or Test read was attempted.
 
 The full B3 run used 1,976,942 sampled rows (2,154,021 source rows minus
 177,079 missing-anchor rows), and the matched stage read no Test labels and
@@ -95,9 +98,10 @@ and use atomic finalization for manifests, metrics, models, OOF, diagnostics,
 logs, exit status, timing, and peak RSS.  Keep target-blind feature caches
 keyed by input/code/recipe/schema/cutoff/availability fingerprints; never mix a
 dense/sparse/Test view.  Run at most two folds concurrently only after checking
-the memory estimate and retaining a 12 GiB reserve.  Start with four threads;
-benchmark feature construction, fitting, inference, and RSS separately before
-trying 12 or 24 threads.
+the memory estimate and retaining a 12 GiB reserve.  Start with 12 threads;
+increase to 24 only for an explicitly authorized isolated run after checking
+feature construction, fitting, inference, and RSS headroom.  Do not run two
+high-thread jobs concurrently.
 
 The frozen parity and matched diagnostic are complete.  Their key result is
 documented in `LEADERBOARD_ROOT_CAUSE_REPORT.md`: on the same 109,439-row
@@ -106,12 +110,11 @@ replay, A/D0 scores `0.789549` official weighted RMSE while B/full-B3 scores
 to `1.82e-12`.  The B/C intervention is an empty no-withholding control
 (`sparse_withheld_window_rows=0`, zero changed features), so it must not be
 interpreted as proof that sparse covariates are harmless.  The old undefined
-recency-weighted experiment is closed.  The bounded next diagnostic is the
-fixed 98-vs-392-round capacity comparison; keep it inside tmux and do not
-create Test outputs.
+recency-weighted experiment is closed.  The fixed 98-vs-392-round capacity
+comparison is complete and failed its recent-origin gate; keep future work
+Train-only unless a separate authorization says otherwise.
 
-The Train-only B3 runner preserves the four-thread default and now accepts a
-bounded `--num-threads` value from 1 through 24.  On this 48-vCPU VM, benchmark
-12 and 24 in separate, explicitly authorized runs before changing the default;
-the thread count is recorded in each manifest/config so comparisons remain
-auditable.
+The Train-only B3 runner accepts a bounded `--num-threads` value from 1 through
+24 and now defaults to 12.  Use 24 only for an explicitly authorized
+higher-throughput run; the thread count is recorded in each manifest/config so
+comparisons remain auditable.

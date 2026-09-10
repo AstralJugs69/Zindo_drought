@@ -27,7 +27,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.run_experiment import _attach_delta
 from scripts.run_hydrological_trajectory import INNER_ORIGINS, OUTER_ORIGINS, _fold
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.availability import build_replay_observation_view
 from src.ml_features import SOURCE_CORE_COLUMNS, SOURCE_HYDRO_HISTORY_COLUMNS, build_hydro_gap_safe_feature_matrix, build_sampled_training_rows, horizon_rebalance_weights
 from src.neural_sequence import (
@@ -274,7 +274,7 @@ def _fit_neural(
 
 
 def _fit_baseline(lgb, *, output: Path, candidate: str, origin: str, train_x: pd.DataFrame, valid_x: pd.DataFrame, y_train: np.ndarray, weights: np.ndarray, ledger: pd.DataFrame, labels: pd.DataFrame) -> dict[str, object]:
-    params = dict(DEFAULT_PARAMS, num_leaves=63, min_data_in_leaf=1000, num_threads=min(4, os.cpu_count() or 1), seed=20260908,
+    params = dict(DEFAULT_PARAMS, num_leaves=63, min_data_in_leaf=1000, num_threads=min(DEFAULT_NUM_THREADS, os.cpu_count() or 1), seed=20260908,
                   feature_fraction_seed=20260908, bagging_seed=20260908, data_random_seed=20260908)
     started = time.perf_counter(); model = lgb.train(params, lgb.Dataset(train_x, label=y_train, weight=weights, feature_name=list(train_x.columns)), num_boost_round=98, callbacks=[lgb.log_evaluation(0)])
     delta = model.predict(valid_x).astype(np.float32); oof = _oof(ledger, labels, delta, origin=origin, model=candidate, seed=None, span=None, epoch=98)

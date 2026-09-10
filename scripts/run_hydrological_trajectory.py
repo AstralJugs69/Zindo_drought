@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_experiment import _attach_delta, _score
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.hydro_trajectory import (
     attach_trajectory_features,
     build_hydro_trajectory_map,
@@ -288,7 +288,7 @@ def main() -> None:
             _json(args.output_dir / "test_feature_contract.json", test_contract)
             del test_local, test_regional_trajectory, test_regional, test_source, test_structural, test_ledger, test
 
-            params = dict(DEFAULT_PARAMS, num_leaves=63, min_data_in_leaf=1000, num_threads=min(4, os.cpu_count() or 1),
+            params = dict(DEFAULT_PARAMS, num_leaves=63, min_data_in_leaf=1000, num_threads=min(DEFAULT_NUM_THREADS, os.cpu_count() or 1),
                           seed=SEED, feature_fraction_seed=SEED, bagging_seed=SEED, data_random_seed=SEED)
             for origin in args.origins:
                 fold, role = _fold(train, template, origin)

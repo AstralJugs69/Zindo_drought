@@ -13,6 +13,7 @@ as a current artifact unless its bytes and manifest checksum are present.
 | full-trained dense B3/98 | available on `zindi-gcp` as Train-only package | manifest records 1,976,942 rows, exact row/label/weight hashes, model SHA-256 `3895b7e3...`; package SHA-256 `4de3ec9d...` | current GCP diagnostic artifact; environment-drift bytes, no Test rows |
 | Dec-2014 D0 model/OOF/manifest | available on `zindi-gcp` | package `gcp_d0_dec2014_20260910.zip`, SHA-256 `f5065e60...`, 109,439 validation rows | rebuilt frozen late stress fold; raw RMSE `0.8096875765`, weighted `0.7895493322` |
 | matched A/B/C package | available on `zindi-gcp` | `gcp_matched_comparison_20260910_v2/`, details SHA-256 `764f7fe1...`; all cell-SSE checks pass | exact paired replay complete; no row-level prediction/submission output |
+| B3 capacity 98-vs-392 comparison | available on `zindi-gcp` | `gcp_b3_capacity_20260910/`, manifest SHA-256 `e839dd79...`, gate SHA-256 `952ef965...`; 2014-04 improves but complete 2014-12 regresses | recent-origin gate failed; retain B3/98; no 2009-01 transfer check or Test output |
 | local-response archive | available (`local_response_20260907T212420Z.zip`) | local and VM SHA-256 `7a45c3a9...` (full hash in `recovered_archives.sha256`) | historical comparator only |
 
 ## Input data
@@ -36,6 +37,8 @@ through `ssh zindi-gcp` in tmux session `zindi`.  The matched result shows
 B/full-B3 and C/dense are identical because the intervention had
 `sparse_withheld_window_rows=0` and changed zero features.  Treat this as a
 no-treatment control, not evidence that sparse covariates cannot matter.  The
-bounded next diagnostic is the fixed 98-vs-392-round capacity comparison; the
-old undefined recency-weighted experiment is closed.  No reset to `origin` is
-permitted; the branch's intentional commits must be preserved.
+bounded fixed 98-vs-392-round capacity comparison is complete and its recent
+gate failed; the old undefined recency-weighted experiment is closed.  Retain
+B3/98 as the development control, keep future LightGBM runs at a 12-thread
+baseline (24 only when explicitly authorized), and do not reset to `origin`.
+The branch's intentional commits must be preserved.

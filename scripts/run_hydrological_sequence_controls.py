@@ -33,7 +33,7 @@ from scripts.run_hydrological_trajectory import (
     _feature_frame,
     _fold,
 )
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.hydro_sequence import PrefixNormalizer, build_hydro_sequence_features
 from src.ml_features import (
     SOURCE_CORE_COLUMNS,
@@ -178,7 +178,7 @@ def main() -> None:
                 DEFAULT_PARAMS,
                 num_leaves=63,
                 min_data_in_leaf=1000,
-                num_threads=min(4, os.cpu_count() or 1),
+                num_threads=min(DEFAULT_NUM_THREADS, os.cpu_count() or 1),
                 seed=SEED,
                 feature_fraction_seed=SEED,
                 bagging_seed=SEED,

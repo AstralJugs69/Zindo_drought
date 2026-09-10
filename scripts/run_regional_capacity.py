@@ -12,7 +12,6 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import subprocess
@@ -27,9 +26,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_experiment import _attach_delta, _score
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.ml_features import (
-    HYDRO_GAP_SAFE_FEATURE_COLUMNS,
     SOURCE_CORE_COLUMNS,
     SOURCE_HYDRO_HISTORY_COLUMNS,
     build_hydro_gap_safe_feature_matrix,
@@ -302,7 +300,7 @@ def main() -> None:
         _json(args.output_dir / "structural_preflight.json", prefit)
         print(json.dumps({"phase": "STRUCTURE_FROZEN_BEFORE_SCORING", **prefit}, indent=2), flush=True)
 
-        params_base = dict(DEFAULT_PARAMS, num_threads=min(4, os.cpu_count() or 1), seed=SEED,
+        params_base = dict(DEFAULT_PARAMS, num_threads=min(DEFAULT_NUM_THREADS, os.cpu_count() or 1), seed=SEED,
                            feature_fraction_seed=SEED, bagging_seed=SEED, data_random_seed=SEED)
         inner_records: list[dict[str, object]] = []
 

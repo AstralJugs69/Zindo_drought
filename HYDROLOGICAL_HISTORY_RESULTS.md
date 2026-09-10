@@ -90,8 +90,10 @@ sha256: 62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c
 
 The remote manifest is `status=completed`, `fit_count=1`, and records the same
 source commit and output SHA. Only the CSV and small manifests were copied to
-Windows; the model, visibility ledger, and other large training artifacts
-remain inspectable through `ssh kaggle`.
+Windows; the model, visibility ledger, and other large training artifacts were
+not independently recovered after the Kaggle runtime restart.  The historical
+Kaggle path is retained as provenance only; current artifacts must be inspected
+on `zindi-gcp`.
 
 ### Zindi processing record
 

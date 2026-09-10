@@ -42,6 +42,9 @@ from src.ml_features import (
 from src.validation import build_direct_horizon_fold, recent_observed_month_blocks
 
 
+DEFAULT_NUM_THREADS = 12
+MAX_NUM_THREADS = 24
+
 DEFAULT_PARAMS = {
     "objective": "regression",
     "metric": "rmse",
@@ -59,6 +62,7 @@ DEFAULT_PARAMS = {
     "feature_fraction_seed": 20260907,
     "bagging_seed": 20260907,
     "data_random_seed": 20260907,
+    "num_threads": DEFAULT_NUM_THREADS,
 }
 
 

@@ -42,7 +42,7 @@ SEED = 20260908
 ROUNDS = 98
 NUM_LEAVES = 63
 MIN_DATA_IN_LEAF = 1000
-DEFAULT_NUM_THREADS = 4
+DEFAULT_NUM_THREADS = 12
 MAX_NUM_THREADS = 24
 TRAIN_COLUMNS = [
     "sample_id", "time", "lat", "lon", "TWS_t", "month_sin", "month_cos",

@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_experiment import _attach_delta, _coverage_hash, _json, _preflight, _score, _sha256
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.local_response import LocalResponse, fit_local_response
 from src.ml_features import HYDRO_GAP_SAFE_FEATURE_COLUMNS, SOURCE_CORE_COLUMNS, SOURCE_HYDRO_HISTORY_COLUMNS, build_sampled_training_rows, build_hydro_gap_safe_feature_matrix, horizon_rebalance_weights
 from src.observation_simulator import SimulatedFold, build_mask_block_fold, build_template_replay_fold
@@ -80,7 +80,7 @@ def main():
     out = args.output_dir.resolve()
     commit, branch = _git_state(args.expected_commit)
     out.mkdir(parents=True, exist_ok=False)
-    params = dict(DEFAULT_PARAMS, num_threads=4, seed=args.seed, feature_fraction_seed=args.seed,
+    params = dict(DEFAULT_PARAMS, num_threads=min(DEFAULT_NUM_THREADS, os.cpu_count() or 1), seed=args.seed, feature_fraction_seed=args.seed,
                   bagging_seed=args.seed, data_random_seed=args.seed)
     config: dict[str, object] = {
         "run_id": out.name, "data_dir": str(args.data_dir.resolve()), "output_dir": str(out),

@@ -3,8 +3,8 @@
 ## Current runtime state — 2026-09-10
 
 Execution has moved to the persistent CPU-only VM reached with `ssh zindi-gcp`.
-Use `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at
-`71d7e89`; run long jobs only in tmux session
+Use `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild`; the capacity
+run was launched from source commit `a44bf70`.  Run long jobs only in tmux session
 `zindi` and keep its `script -af /home/milli/zindi-session.log` logger alive.
 The authoritative Train/Test/SampleSubmission files are hash-matched on the VM,
 and surviving fold archives are recorded in `RECOVERY_MATRIX_20260910.md`.
@@ -25,9 +25,31 @@ The B/C result is an empty no-withholding control (`sparse_withheld_window_rows=
 zero changed features), not evidence that sparse covariates cannot matter.
 No Test labels, predictions, calibration, or submission were created.
 
-The old undefined recency-weighted follow-up is closed.  The single bounded
-next diagnostic is a fixed 98-vs-392-round B3 comparison at the 2014-04 and
-2014-12 out-of-time origins, with no Test output or submission.
+The old undefined recency-weighted follow-up is closed.  The fixed 98-vs-392
+capacity comparison is now complete; see `CAPACITY_BOTTLENECK_RESULTS.md` for
+the gated result and remote artifact path.
+
+## 2026-09-10 — capacity bottleneck decision closed
+
+The Train-only B3 comparison ran on `zindi-gcp` in tmux at commit
+`a44bf7053b187133f5d26aea4b44fe03aef13ef4`, with the unchanged 446-feature,
+63-leaf, `min_data_in_leaf=1000` recipe fit once to 392 rounds and scored
+checkpoints 98 and 392 on identical paired rows.  At 2014-04, raw h1--7 RMSE
+improved `0.581798 -> 0.567687` (h=4 is absent and was not imputed).  At the
+complete 2014-12 origin it worsened `0.809378 -> 0.814031`; official weighted
+RMSE worsened `0.789549 -> 0.791794`.  No recent month with at least 1,000
+rows exceeded the `+0.02` regression guardrail, but both origins had to
+improve, so `recent_gate_pass=false` and the optional 2009-01 transfer check
+was not run.
+
+**Decision:** close extra boosting rounds as a standalone remedy and retain
+B3/98 as the development control.  Continue with representation/data-transfer
+diagnostics only if a separately authorized hypothesis is supplied; do not
+launch a larger capacity grid or create Test predictions/submissions.
+
+Future GCP LightGBM work now uses a 12-thread baseline, with 24 threads as an
+explicitly authorized upper benchmark.  The capacity run itself remains the
+pre-change four-thread measurement because it was not interrupted.
 
 ## 2026-09-09 — leaderboard root-cause investigation complete
 
@@ -51,14 +73,12 @@ extrapolation is not supported. Existing outer OOF remains development
 evidence: pooled h1--7 weighted B3/persistence is `0.583339/0.689653`, while
 the late Dec-2014 fold is `0.789549` weighted (`0.809688` raw).
 
-**Exactly one next experiment:** a frozen, late-prefix, Test-schedule-matched
-recency-weighted B3/98 fit, trained through source month 2015-06 and evaluated
-once on held-out source months 2015-07/08. Use the unchanged 446-feature,
-63-leaf/98-round recipe and one predeclared Test-support-derived weight; no
-grid, Test labels, prediction file, or submission. Falsify if both held-out
-months do not improve by at least `0.005`, official h1--7 worsens by more than
-`0.005`, or any availability/hash invariant fails. Verify that this block has
-not already influenced a model choice before running it.
+**Historical proposal (closed):** the late-prefix, Test-schedule-matched
+recency-weighted B3/98 fit described in the original 2026-09-09 note is not an
+active next step.  July/August 2015 was already used as development evidence;
+the bounded capacity comparison above replaced it and failed its two-origin
+gate.  Do not run that recency proposal, a larger capacity grid, or create a
+Test prediction/submission from this branch.
 
 ## 2026-09-09 — frozen full-training deployment
 

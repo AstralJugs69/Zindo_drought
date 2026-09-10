@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.availability import build_replay_observation_view
 from src.ml_features import (
     SOURCE_CORE_COLUMNS,
@@ -506,7 +506,7 @@ def main() -> None:
         params.update({
             "num_leaves": NUM_LEAVES,
             "min_data_in_leaf": MIN_DATA_IN_LEAF,
-            "num_threads": min(4, os.cpu_count() or 1),
+            "num_threads": min(DEFAULT_NUM_THREADS, os.cpu_count() or 1),
             "seed": SEED,
             "feature_fraction_seed": SEED,
             "bagging_seed": SEED,

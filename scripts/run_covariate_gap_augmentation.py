@@ -26,7 +26,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.run_experiment import _attach_delta
 from scripts.run_hydrological_trajectory import INNER_ORIGINS, OUTER_ORIGINS, _fold
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.availability import build_replay_observation_view
 from src.covariate_gap_augmentation import build_augmented_b3_matrix, derive_test_schedule_patterns
 from src.metrics import raw_rmse, score_by_horizon
@@ -148,7 +148,7 @@ def main() -> None:
             train_x, augmentation = build_augmented_b3_matrix(rows, view.source, view.structural, maps, patterns, recipe=args.recipe, seed=args.augmentation_seed)
         if train_x.columns.tolist() != valid_x.columns.tolist():
             raise AssertionError("training/validation B3 feature schemas differ")
-        params = dict(DEFAULT_PARAMS, num_leaves=63, min_data_in_leaf=1000, num_threads=min(4, os.cpu_count() or 1),
+        params = dict(DEFAULT_PARAMS, num_leaves=63, min_data_in_leaf=1000, num_threads=min(DEFAULT_NUM_THREADS, os.cpu_count() or 1),
                       seed=20260908, feature_fraction_seed=20260908, bagging_seed=20260908, data_random_seed=20260908)
         model = lgb.train(params, lgb.Dataset(train_x, label=y_train, weight=weights, feature_name=list(train_x.columns)), num_boost_round=ROUNDS, callbacks=[lgb.log_evaluation(0)])
         prediction = fold.ledger.last_observed_TWS.to_numpy(np.float64) + model.predict(valid_x)

@@ -26,7 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.run_lgbm_core import DEFAULT_PARAMS
+from scripts.run_lgbm_core import DEFAULT_NUM_THREADS, DEFAULT_PARAMS
 from src.baselines import predict_persistence
 from src.metrics import raw_rmse, score_by_horizon
 from src.ml_features import (
@@ -209,7 +209,7 @@ def _model_run(mode: str, train: pd.DataFrame, template: pd.DataFrame, out_dir: 
     labels = train.loc[:, ["sample_id", "target"]].copy()
     params = dict(DEFAULT_PARAMS)
     params.update({"seed": seed, "feature_fraction_seed": seed, "bagging_seed": seed,
-                   "data_random_seed": seed, "num_threads": os.cpu_count() or 1})
+                   "data_random_seed": seed, "num_threads": min(DEFAULT_NUM_THREADS, os.cpu_count() or 1)})
     feature_names = VISIBLE_HISTORY_FEATURE_COLUMNS if mode == "r03" else HYDRO_GAP_SAFE_FEATURE_COLUMNS
     build_features = build_visible_history_feature_matrix if mode == "r03" else build_hydro_gap_safe_feature_matrix
     absolute_target = mode == "r04"
