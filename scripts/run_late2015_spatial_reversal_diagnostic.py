@@ -881,7 +881,9 @@ def main() -> None:
         # Shared-scale maps: three suspicious months and three earlier same-month
         # controls.  SVG keeps the artifact readable without installing a plotting stack.
         selected = list(SUSPICIOUS_MONTHS)
-        for candidate in ("2012-01", "2012-02", "2012-06", "2011-01", "2011-02", "2011-06"):
+        # 2009-01/02/06 are present and provide a common early-control triplet;
+        # fall back to later matched months only if a source file changes.
+        for candidate in ("2009-01", "2009-02", "2009-06", "2012-01", "2012-02", "2013-06"):
             if candidate not in selected and candidate in set(train["source_month"].unique()):
                 selected.append(candidate)
         selected = selected[:6]
