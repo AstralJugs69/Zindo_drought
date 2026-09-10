@@ -9,7 +9,36 @@
 EXP005/EXP009/EXP010 records are retained as legacy references only; no new
 candidate is promoted under the corrected multi-scenario protocol.
 
-## 2026-09-10 — submission-compliant coordinate-free B3-C reference
+## 2026-09-10 — GLDAS authenticated sample re-probe — access gate failed
+
+Before any bulk download, a real `GET` of the existing official April 2014
+GLDAS-2.1 Noah monthly sample was issued from `zindi-gcp` using the configured
+`~/.netrc`.  The probe used an in-memory cookie jar, HTTPS-only redirect
+handling, and default secure TLS verification.  Earthdata returned HTTP `401
+Unauthorized` from `urs.earthdata.nasa.gov` (`text/html`); there was no
+downloaded NetCDF to verify.  The probe retained only sanitized status,
+content-type, host, and verification metadata; credentials, cookies,
+authorization headers, and response bodies were never logged or persisted.
+
+Durable records remain remote at:
+
+- `/home/milli/gldas_sample/reprobe_20260910_v2/access_measurement.json`
+- `/home/milli/gldas_sample/reprobe_20260910_v2/external_access_record.json`
+
+`external_access_record.json` now reflects this measured result and keeps the
+prior credential-missing `401` record under `historical_failure`.  The product
+gate itself is independent and documented as a historical-proxy eligibility
+pass: official GLDAS-2.1 documentation covers the archive from 2000 onward,
+including the challenge's historical periods, while GLDAS-2.2/GRACE-derived
+products remain excluded.  Eligibility does not override the failed sample
+access/NetCDF gate.
+
+Therefore no GLDAS bulk acquisition, ten-feature join, or paired external fit
+was started.  The four saved B3-C controls were reused as-is and not rerun;
+the external candidate remains blocked pending a successful authenticated
+sample GET.  No Test predictions or submission artifacts were created.
+
+## 2026-09-10 — submission-compliant coordinate-free B3-C reference (historical pre-credential snapshot)
 
 The first compliant rebuild is complete on `zindi-gcp` in the persistent
 `zindi` tmux session, from source commit
@@ -35,14 +64,16 @@ large models/OOF files remain remote.  No Test labels, predictions,
 submission, calibration, ensemble, or upload was created.
 
 The one authorized external intervention was held at the required access
-gate.  An official GLDAS-2.1 Noah monthly 0.25-degree sample was discoverable,
-but its first data GET without credentials returned HTTP 401 and no noninteractive
-Earthdata credential mechanism was configured.  No bulk download or substitute
-dataset was attempted.  The exact ten-feature contract (four soil-water
-layers, SWE, canopy storage, current/anchor sums, current-minus-anchor, and
-exact previous-calendar-month delta), units, cutoff, and missingness rules are
-recorded in `external_access.json`; the external candidate is
-`blocked_before_bulk_acquisition`.
+gate.  In this earlier pre-credential snapshot, an official GLDAS-2.1 Noah
+monthly 0.25-degree sample was discoverable, but its first data GET without
+credentials returned HTTP 401 and no noninteractive Earthdata credential
+mechanism was configured.  No bulk download or substitute dataset was
+attempted.  The exact ten-feature contract (four soil-water layers, SWE,
+canopy storage, current/anchor sums, current-minus-anchor, and exact
+previous-calendar-month delta), units, cutoff, and missingness rules are
+recorded in that run's `external_access.json`; the external candidate was
+`blocked_before_bulk_acquisition`.  The later credentialed re-probe above is
+the current access result.
 
 **Decision:** B3-C is the submission-compliant reference.  Historical
 coordinate-bearing B3 remains a legacy diagnostic and is not suitable for a

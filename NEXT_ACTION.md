@@ -1,6 +1,36 @@
 # Next action — B3/98 full submission result recorded
 
-## 2026-09-10 — submission-compliant B3-C rebuild completed; GLDAS gate blocked
+## 2026-09-10 — GLDAS authenticated sample re-probe — access still blocked
+
+The newly supplied Earthdata configuration was tested from `zindi-gcp` before
+any bulk acquisition.  The probe performed a real `GET` of the existing April
+2014 GLDAS-2.1 sample through `~/.netrc`, kept cookies in memory, followed only
+HTTPS redirects, and retained the normal TLS certificate checks.  The server
+returned HTTP `401 Unauthorized` from `urs.earthdata.nasa.gov` with an HTML
+content type.  No response body, credentials, cookies, or authorization
+headers were written to the log or artifacts; no sample file was retained, so
+the NetCDF/product/variable/unit verification could not pass.
+
+Sanitized probe record:
+`/home/milli/gldas_sample/reprobe_20260910_v2/access_measurement.json`
+
+Measured access record (with the earlier credential-missing result preserved
+under `historical_failure`):
+`/home/milli/gldas_sample/reprobe_20260910_v2/external_access_record.json`
+
+The independent product gate is documented as eligible by historical proxy:
+the official GLDAS-2.1 Noah monthly archive covers 2000 onward, which covers
+the challenge's historical periods, and the archived months are not invalidated
+by main-production latency.  This product gate is separate from login/access;
+the sample still must verify as NetCDF before bulk acquisition.  GLDAS-2.2 and
+GRACE-derived products remain excluded.
+
+Because the measured sample GET failed, bulk acquisition, the ten-feature
+external join, and all paired external fits remain stopped.  The saved B3-C
+controls were not rerun unnecessarily.  No substitute dataset, Test
+prediction, or submission was created.
+
+## 2026-09-10 — submission-compliant B3-C rebuild completed; GLDAS gate blocked (historical pre-credential snapshot)
 
 The coordinate-free B3-C reference was rebuilt on the persistent `zindi-gcp`
 VM from source commit `958060ffca757c50c936d678bdaaca2533bae780` in tmux
@@ -31,12 +61,15 @@ resident set, and exit status 0.  The optional in-process `psutil` sampler was
 not installed, so the external time record is the authoritative RAM evidence.
 
 The one permitted external intervention was not run.  An official
-GLDAS-2.1 Noah monthly 0.25-degree sample URL was checked: discovery/HEAD was
-available, but the first data GET without credentials returned HTTP 401.  No Earthdata token,
-`.netrc`, username, or credential file was present, no bulk acquisition began,
-and no substitute product was used.  The ten-feature GLDAS contract and exact
-causal/missingness rules are recorded in `external_access.json`; its status is
-`blocked_http_401_no_noninteractive_earthdata_credentials`.
+GLDAS-2.1 Noah monthly 0.25-degree sample URL was checked in this earlier
+snapshot: discovery/HEAD was available, but the first data GET without
+credentials returned HTTP 401.  No Earthdata token, `.netrc`, username, or
+credential file was present at that time, no bulk acquisition began, and no
+substitute product was used.  The ten-feature GLDAS contract and exact
+causal/missingness rules are recorded in that run's `external_access.json`;
+its status is the historical
+`blocked_http_401_no_noninteractive_earthdata_credentials` result.  The later
+credentialed re-probe is recorded above and is the current access result.
 
 **Decision:** B3-C is the current submission-compliant reference; the
 historical coordinate-bearing B3 is explicitly unsuitable for a compliant
