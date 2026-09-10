@@ -58,6 +58,47 @@ retrospective experiment, so bounded acquisition and the exact ten-feature
 candidate may proceed.  The fixed B3-C controls, inner→recent→older gates,
 12-thread baseline, and no-Test/submission policy remain unchanged.
 
+## 2026-09-10 — GLDAS external gate completed; retain B3-C
+
+The bounded acquisition and paired experiment are complete.  The remote
+manifest at
+`/home/milli/gldas_sample/gldas_external_20260910_v1/manifest.json` records
+147/147 requested months, 15,715 requested cells, 2,310,105 compact
+cell-month rows, and zero missing periods.  The implementation materializes
+only the ten approved GLDAS features.  It preserves source missingness as
+`NaN`, forbids partial sums, uses source month `t` only, and uses the exact
+previous calendar month for the delta.  The store, manifest, request plan, and
+coverage artifacts remain remote for inspection.
+
+The paired run is
+`/home/milli/zindi_drought_gcp/drought_runs/gldas_external_20260910_v3/`,
+source commit `90c4efdf52410b3f1ccff537cda920b0813c63d0`, seed `20260908`,
+98 rounds, 63 leaves, `min_data_in_leaf=1000`, and 12 threads.  Four saved B3-C
+controls were reused after exact provenance/schema/hash checks.  All prefit
+causality and schema checks passed, including row-order invariance,
+future-source perturbation invariance, target rejection, exact previous-month
+alignment, and no partial-sum fill.
+
+| Origin | B3-C raw h1--7 | GLDAS raw h1--7 | B3-C weighted | GLDAS weighted | h>7 B3-C → GLDAS |
+|---|---:|---:|---:|---:|---:|
+| 2003-04 | 0.585218 | 0.580513 | 0.585130 | 0.580439 | n/a |
+| 2004-04 | 0.563164 | 0.557546 | 0.563051 | 0.557438 | n/a |
+| 2014-04 | 0.588990 | 0.585750 | n/a (h=4 absent) | n/a (h=4 absent) | 1.127704 → 1.043011 (97 rows) |
+| 2014-12 | 0.803770 | 0.800257 | 0.785391 | 0.788185 | 1.115944 → 1.068355 (90 rows) |
+
+The inner gate passes: GLDAS strictly improves raw h1--7 at both 2003-04 and
+2004-04.  The recent raw check also passes at both 2014 origins, but the outer
+gate fails its independent safeguards.  December's weighted proxy regresses by
+`+0.002794`, and the 2014-12 monthly regression guard is `+0.031834`, exceeding
+the `0.02` limit.  Consequently the 2009-01 transfer gate was not run; its
+durable record is `status=not_run`, `reason=outer_gate_failed`.
+
+**Decision:** retain B3-C.  GLDAS is a successfully accessed and fully measured
+diagnostic candidate under the conditional historical-proxy product gate, but
+it is not promoted.  The run exited 0 after 19:10.15 with 33,616,896 kB
+maximum RSS and created no Test labels, predictions, calibration, submission,
+or upload artifacts.
+
 ## 2026-09-10 — submission-compliant coordinate-free B3-C reference (historical pre-credential snapshot)
 
 The first compliant rebuild is complete on `zindi-gcp` in the persistent

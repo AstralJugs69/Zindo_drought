@@ -49,6 +49,45 @@ acquisition of only the required months/variables may proceed.  The ten-feature
 contract, causal/missingness rules, exact B3-C pairing, fixed inner→recent→older
 gates, 12-thread baseline, and no-Test/submission policy remain unchanged.
 
+## 2026-09-10 — GLDAS external gate completed; retain B3-C
+
+The authorized GLDAS intervention completed its bounded, submission-compliant
+replay.  The acquisition manifest at
+`/home/milli/gldas_sample/gldas_external_20260910_v1/manifest.json` records all
+147 requested months, 15,715 requested grid cells, 2,310,105 compact
+cell-month rows, and zero missing periods.  Only the ten approved features were
+materialized; source fill/missing values remain `NaN`, and current, anchor, and
+exact-previous-calendar-month sums are emitted only when all six source
+quantities are finite.  The raw store and detailed coverage files remain on
+`zindi-gcp`; no bulk artifacts were copied to Windows.
+
+The paired run is
+`/home/milli/zindi_drought_gcp/drought_runs/gldas_external_20260910_v3/`,
+from commit `90c4efdf52410b3f1ccff537cda920b0813c63d0`, with seed `20260908`,
+98 rounds, 63 leaves, `min_data_in_leaf=1000`, and 12 threads.  All four saved
+B3-C controls were reused after exact provenance/schema/hash checks.  The
+causality, schema, row-order, target-blindness, previous-month, and missingness
+prefit checks passed for both the control and GLDAS candidate.  The external
+sample/access record is the measured HTTP 200 NetCDF result above; the earlier
+401 is retained only as history.
+
+| Origin | B3-C raw h1--7 | GLDAS raw h1--7 | B3-C weighted | GLDAS weighted | h>7 B3-C → GLDAS |
+|---|---:|---:|---:|---:|---:|
+| 2003-04 | 0.585218 | 0.580513 | 0.585130 | 0.580439 | n/a |
+| 2004-04 | 0.563164 | 0.557546 | 0.563051 | 0.557438 | n/a |
+| 2014-04 | 0.588990 | 0.585750 | n/a (h=4 absent) | n/a (h=4 absent) | 1.127704 → 1.043011 (97 rows) |
+| 2014-12 | 0.803770 | 0.800257 | 0.785391 | 0.788185 | 1.115944 → 1.068355 (90 rows) |
+
+Both inner origins pass the strict raw-improvement rule.  Both recent origins
+also improve on raw h1--7, but the outer gate fails as required: December's
+weighted proxy regresses by `+0.002794`, and the 2014-12 monthly regression
+guard is `+0.031834`, above the `0.02` limit.  The 2009-01 transfer check was
+therefore not run (its durable artifact records `not_run` with reason
+`outer_gate_failed`).  The final decision is **retain B3-C**; GLDAS remains a
+measured diagnostic candidate and is not promoted.  The run exited 0 after
+19:10.15 with 33,616,896 kB maximum RSS, and wrote no Test predictions or
+submission files.
+
 ## 2026-09-10 — submission-compliant B3-C rebuild completed; GLDAS gate blocked (historical pre-credential snapshot)
 
 The coordinate-free B3-C reference was rebuilt on the persistent `zindi-gcp`
