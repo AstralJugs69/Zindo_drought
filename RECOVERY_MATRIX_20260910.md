@@ -10,9 +10,9 @@ as a current artifact unless its bytes and manifest checksum are present.
 | B1 local, commit `545fe996` | four fold models + OOF | archive SHA-256 and embedded manifest | recoverable historical evidence |
 | B2 regional, commit `545fe996` | four fold models + OOF | archive SHA-256 and embedded manifest | recoverable historical evidence |
 | B3 both, commit `545fe996` | Jan-2009, Apr-2014, Dec-2014 fold models + OOF | archive SHA-256 and embedded manifest | recoverable late-fold evidence; Sep-2007 is absent from this archive |
-| full-trained dense B3/98 | absent | only historical docs/metrics references remain | do not claim available; rebuild only after baseline parity and explicit run gate |
-| Dec-2014 D0 model/OOF/manifest | absent | not in local archive inventory or fresh VM | exact matched diagnosis remains incomplete |
-| matched A/B/C package | absent | no `leaderboard_failure_*` package recovered | restore exact artifacts or perform the authorized VM rebuild |
+| full-trained dense B3/98 | available on `zindi-gcp` as Train-only package | manifest records 1,976,942 rows, exact row/label/weight hashes, model SHA-256 `3895b7e3...`; package SHA-256 `4de3ec9d...` | current GCP diagnostic artifact; environment-drift bytes, no Test rows |
+| Dec-2014 D0 model/OOF/manifest | available on `zindi-gcp` | package `gcp_d0_dec2014_20260910.zip`, SHA-256 `f5065e60...`, 109,439 validation rows | rebuilt frozen late stress fold; raw RMSE `0.8096875765`, weighted `0.7895493322` |
+| matched A/B/C package | available on `zindi-gcp` | `gcp_matched_comparison_20260910_v2/`, details SHA-256 `764f7fe1...`; all cell-SSE checks pass | exact paired replay complete; no row-level prediction/submission output |
 | local-response archive | available (`local_response_20260907T212420Z.zip`) | local and VM SHA-256 `7a45c3a9...` (full hash in `recovered_archives.sha256`) | historical comparator only |
 
 ## Input data
@@ -29,10 +29,12 @@ not a new output.
 
 ## Resume gate
 
-The minimum useful state is not yet complete: the VM, inputs, environment, and
-non-training tests are ready, and fold-level recovery is available, but exact
-D0/full-B3/matched A/B/C artifacts are missing.  The next authorized action is
-to run one frozen Sep-2007 D0/B3 parity validation on the VM in tmux, persist a
-complete manifest, and use its measured result to decide whether late-period
-D0 and full-B3 rebuilds are scientifically justified.  No reset to `origin`
-is permitted; the branch's intentional commits must be preserved.
+The minimum useful recovery state is complete: the VM, hash-matched inputs,
+isolated environment, non-training tests, frozen Sep-2007 parity, late D0,
+Train-only full B3, and matched A/B/C outputs are all present and inspectable
+through `ssh zindi-gcp` in tmux session `zindi`.  The matched result shows
+B/full-B3 and C/dense are identical on the same legal replay, so dense-versus-
+sparse covariates are not the measured cause of the gap.  The next recency-
+weighted late-prefix experiment remains only a predeclared recommendation and
+requires explicit authorization.  No reset to `origin` is permitted; the
+branch's intentional commits must be preserved.

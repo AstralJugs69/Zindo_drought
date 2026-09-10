@@ -29,9 +29,10 @@ CPU-only; no GPU/neural campaign is planned.
 ## Verified host and software state
 
 The VM reported Ubuntu 22.04, 48 vCPUs, about 62 GiB RAM, and about 192 GiB
-free on the 194 GiB root disk.  No training process was running during the
-initial inspection.  The checkout is on `codex/validation-rebuild` at
-`32e506b2412e62400933ef06496fe191b3184163` with no tracked changes.
+free on the 194 GiB root disk.  The checkout is on
+`codex/validation-rebuild` at `09d52e3` after the diagnostic runner's schema
+persistence fix, with no tracked changes.  The completed recovery diagnostics
+were launched at the preceding clean commit `7e44744739065dfd6bf7a5e53ae3af28b3b79450`.
 
 The environment is intentionally isolated.  Exact observed versions are kept
 in `/home/milli/zindi_drought_gcp/environment.lock.txt`:
@@ -46,7 +47,7 @@ pytest 9.1.1
 ```
 
 The repository test suite was run in tmux with the four-thread caps and passed
-`56 passed in 5.09s`.  This is a non-training parity check, not model-score
+`56 passed in 6.51s`.  This is a non-training parity check, not model-score
 parity; package/hardware differences from historical Kaggle runs remain.
 
 ## Authoritative inputs and recovery
@@ -63,11 +64,24 @@ Windows checkout to the VM and verified there with SHA-256:
 Surviving local archives are preserved at
 `/home/milli/zindi_drought_gcp/recovered_archives/`; their verified hashes are
 in `recovered_archives.sha256`.  They contain completed fold-level B0/B1/B2/B3
-models and OOF files and compact manifests.  The exact full-trained B3 model,
-the Dec-2014 D0 package, and the matched A/B/C directory were not present in
-the VM or local archive inventory.  Historical metrics and commit references
-must therefore remain labelled historical until an artifact's manifest and
-checksum are independently verified.
+models and OOF files and compact manifests.  The previously missing exact
+diagnostic state has now been rebuilt in three unique directories:
+
+- `drought_runs/gcp_d0_b3_parity_20260910` — Sep-2007 D0/B3 parity, raw RMSE
+  `0.5283539879552412` (a measured environment-drift trigger).
+- `drought_runs/gcp_d0_dec2014_20260910` — Dec-2014 D0 package, SHA-256
+  `f5065e604b84289f6c33ce8a99e620702a878810289c244547e0e04d7bb73db7`.
+- `drought_runs/gcp_full_b3_train_only_20260910` — Train-only full B3 package,
+  SHA-256 `4de3ec9d52865d1e45247d511cf7a374ac64c314ecb57d16eb4c2795122c4858`.
+- `drought_runs/gcp_matched_comparison_20260910_v2` — completed matched A/B/C
+  compact outputs; details SHA-256
+  `764f7fe16dda19976126dd4eb0bdb3ff3a1bf49a60d933c708ecee94435ec9dc`.
+
+The full B3 run used 1,976,942 sampled rows (2,154,021 source rows minus
+177,079 missing-anchor rows), and the matched stage read no Test labels and
+wrote no row-level prediction or submission file.  These are current GCP
+diagnostic artifacts; their booster bytes are not claimed byte-identical to
+the historical Kaggle model.
 
 The persistent disk is not an independent backup.  Backup status is currently
 **not configured/verified**; do not describe VM-local copies as backed up.
@@ -84,12 +98,10 @@ the memory estimate and retaining a 12 GiB reserve.  Start with four threads;
 benchmark feature construction, fitting, inference, and RSS separately before
 trying 12 or 24 threads.
 
-The scientifically useful next step is one representative availability-faithful
-Sep-2007 D0/B3 validation using the frozen historical recipe (98 rounds, 63
-leaves, `min_data_in_leaf=1000`, 446 features) only after the runner's actual
-parameters and artifact contract are verified on this VM.  Its historical raw
-RMSE (`0.5283539879552412`) is a drift trigger, not a score to force.  After
-parity, rebuild the late Dec-2014 D0 OOF and, only if required, the full-trained
-B3 artifact on the VM; then run the matched A/B/C comparison on identical
-origin/sample/horizon exposure.  Do not run that next experiment automatically
-from this runbook.
+The frozen parity and matched diagnostic are complete.  Their key result is
+documented in `LEADERBOARD_ROOT_CAUSE_REPORT.md`: on the same 109,439-row
+replay, A/D0 scores `0.789549` official weighted RMSE while B/full-B3 scores
+`0.737579`; C/dense is exactly equal to B.  Cell-SSE aggregation is conserved
+to `1.82e-12`.  This does not authorize the one recommended next experiment:
+a late-prefix, Test-schedule-matched recency-weighted B3/98 fit.  Keep that
+experiment gated behind explicit authorization and do not create Test outputs.

@@ -6,13 +6,16 @@
 **Submission:** `submission_b3_dense_history_98_5bc9e52.csv`, SHA-256
 `62f1876ee7a26dfc5289c68d724353e9b89185d146eb7e8335a827e923424e7c`
 
-> **Current-runtime caveat (2026-09-09):** The live Kaggle runtime is reachable
-> through `ssh kaggle`, but its post-restart inventory does not contain the
-> saved full B3 model, the Dec-2014 D0 replay package, or the interrupted
-> matched-comparison run directory cited in this report.  The historical
-> results below remain recorded evidence; the matched A/B/C extension is not
-> currently reproducible until those exact artifacts are restored.  No
-> outer-fold substitute or retraining is authorized for this diagnosis.
+> **Current-runtime verification (2026-09-10):** The exact diagnostic state was
+> rebuilt on the persistent `zindi-gcp` VM from hash-matched Train/Test inputs.
+> A fresh Dec-2014 D0 package, a Train-only full B3 model, and the matched A/B/C
+> comparison now exist under `/home/milli/zindi_drought_gcp/drought_runs/`.
+> The comparison was read-only and wrote no Test predictions or submission;
+> its model fit ran under the isolated GCP environment, so the booster bytes
+> are not expected to equal the historical Kaggle booster.  Training row,
+> label, and weight hashes do match the frozen full-B3 contract.  Historical
+> sections below remain valid as historical evidence; the current matched
+> results are recorded in section 0.
 
 ## Executive conclusion
 
@@ -29,12 +32,22 @@ are unavailable.
 This is a measured explanation of the gap, not a claim that one physical regime
 or one geographic cell has been identified as the hidden leaderboard failure.
 
+The current matched replay additionally rules out the dense-versus-sparse
+covariate view as the primary explanation: the full B3 model produced exactly
+the same predictions when replayed with the legal sparse source view and with
+the retrospective dense view.  The improvement from the late D0 model to the
+full B3 model is therefore a joint later-training-exposure/fitted-model effect,
+not a pure availability intervention; temporal transfer and support mismatch
+remain the leading actionable explanations.
+
 ## Investigation contract and provenance
 
-- No model was fit, no hyperparameter was selected, no Test prediction file was
-  written, and no leaderboard upload was made during this investigation.
-- Existing saved B3 model/OOF artifacts were scored or read only.  Large model
-  and OOF artifacts remain on Kaggle; only compact diagnostic summaries are
+- The original 2026-09-09 leaderboard investigation was read-only.  The
+  authorized 2026-09-10 GCP recovery additionally fit one frozen Dec-2014 D0
+  model and one frozen Train-only full B3 model solely to recreate the missing
+  diagnostic state; the matched A/B/C stage itself fit no model.
+- No Test prediction file, calibration, or leaderboard upload was made.  Large
+  model and OOF artifacts remain remote; only compact diagnostic summaries are
   referenced below.
 - The staged runner is
   `scripts/run_leaderboard_failure_investigation.py`.  The unit guards are in
@@ -47,6 +60,58 @@ or one geographic cell has been identified as the hidden leaderboard failure.
   the final sample-inference stage ran at
   `0b8e6aabc9d49d529eeb6806e79e4e5b1721d5f5`.  These commits differ only in
   diagnostic code fixes; the saved model/data/configuration were unchanged.
+
+## 0. Current GCP matched A/B/C rebuild (2026-09-10)
+
+The rebuilt diagnostic ran on `zindi-gcp` in tmux session `zindi` at commit
+`7e44744739065dfd6bf7a5e53ae3af28b3b79450` (the follow-up runner patch that
+persists `feature_schema.json` is `09d52e3`).  The input hashes are the same
+as the integrity table below.  The remote artifacts were inspected in place;
+large models/OOFs were not copied to Windows.
+
+The D0 late-fold package is
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_d0_dec2014_20260910.zip`
+(SHA-256 `f5065e604b84289f6c33ce8a99e620702a878810289c244547e0e04d7bb73db7`),
+with 109,439 validation rows, raw RMSE `0.8096875764630631`, and official
+h1--7 weighted RMSE `0.7895493322211262`.  The full Train-only B3 package is
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_full_b3_train_only_20260910.zip`
+(SHA-256 `4de3ec9d52865d1e45247d511cf7a374ac64c314ecb57d16eb4c2795122c4858`);
+it fit once on 1,976,942 rows and explicitly read zero Test rows.  Its model
+SHA-256 is `3895b7e384b067f606994591f653a901480854aeda57aad045e3ebe9395811de`.
+
+The matched output directory is
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_matched_comparison_20260910_v2/`.
+The saved D0 OOF reproduces as A within `4.440892098500626e-16`.  B and C use
+the same replay ledger and structural panel; their base features are equal,
+zero features changed, and their predictions/SSE are identical.  B uses
+2,122,894 sparse source rows while C sees 2,154,021 retrospective dense rows;
+the sparse withheld-window count is zero.  C is not a deployable view when
+those historical covariates are unavailable.
+
+| replay scope | rows (h1--7 / >7) | A D0 weighted / raw | B full sparse weighted / raw | C full dense weighted / raw | persistence weighted / raw |
+|---|---:|---:|---:|---:|---:|
+| complete replay | 109,439 (109,349 / 90) | 0.789549 / 0.809688 | 0.737579 / 0.738504 | 0.737579 / 0.738504 | 0.828644 / 0.861803 |
+| exact full-training exposure | 15,544 (15,544 / 0) | 0.793304 / 0.791330 | 0.738129 / 0.736472 | 0.738129 / 0.736472 | 0.834851 / 0.832697 |
+| different anchor | 89,469 (89,394 / 75) | 0.787844 / 0.811208 | 0.736430 / 0.735651 | 0.736430 / 0.735651 | 0.826381 / 0.866191 |
+
+The exposure ledger contains 105,013 rows whose source ID is in the full
+training sample (15,544 exact exposure and 89,469 different-anchor rows) and
+4,426 rows whose source ID is not sampled.  The corrected additive
+aggregation passes every cell check: `all_ok=true`, maximum cell-versus-row
+SSE difference `1.8189894035458565e-12`, and maximum RMSE decomposition error
+`2.220446049250313e-16`.  The details manifest records
+`no_row_level_prediction_file_written=true`, `submission_written=false`, and
+`test_labels_used=false`.  Compact hashes are
+`matched_comparison.json` `17505659518cdcee156946258d7f414bf87ff7d6c8b9af65e5193c257547536a`,
+`matched_comparison_details.json`
+`764f7fe16dda19976126dd4eb0bdb3ff3a1bf49a60d933c708ecee94435ec9dc`, and
+`matched_overall.csv`
+`d7a84c3c1e7a957e80a36c5e372f71efd2d32bcdf8ea470cefd538194c83c192`.
+
+This paired result is diagnostic rather than a new leaderboard candidate.  It
+does not authorize the next recency-weighted late-prefix experiment; that
+experiment remains a single, predeclared recommendation and must be separately
+authorized before any training.
 
 ## 1. Integrity and exact alignment
 

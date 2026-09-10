@@ -5,27 +5,39 @@
 **Competition close:** 2026-09-13  
 **Document role:** Canonical research ledger, modeling blueprint, experiment discipline, leakage specification, compute plan, and living decision record for the entire challenge.  
 **First compiled:** 2026-09-07  
-**Current phase:** Validation rebuild in progress. Historical EXP005/EXP009/EXP010
-records are retained as legacy references only; no candidate is currently promoted
-under the corrected multi-scenario protocol.
+**Current phase:** Validation rebuild completed on the persistent GCP VM. Historical
+EXP005/EXP009/EXP010 records are retained as legacy references only; no new
+candidate is promoted under the corrected multi-scenario protocol.
 
 ## 2026-09-10 — execution host migrated to persistent GCP VM
 
 The active execution host is now the persistent CPU-only VM reached with
 `ssh zindi-gcp`, not Kaggle/Pinggy.  The user-owned checkout is
 `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at commit
-`32e506b2412e62400933ef06496fe191b3184163`.  Long-running work must run in
+`09d52e3`.  Long-running work must run in
 tmux session `zindi`, whose shell is logged with
 `script -af /home/milli/zindi-session.log`; see `GCP_MIGRATION_RUNBOOK.md`.
 
 Train/Test/SampleSubmission are present on the VM and match the recorded
 SHA-256 values.  Surviving fold archives are under
 `/home/milli/zindi_drought_gcp/recovered_archives/`; exact full-B3, Dec-2014
-D0, and matched A/B/C artifacts remain unavailable after the Kaggle restart.
-The VM environment is isolated and recorded in `environment.lock.txt`; the
+D0, and matched A/B/C artifacts have now been rebuilt there.  The VM
+environment is isolated and recorded in `environment.lock.txt`; the
 non-training test suite passed 56 tests with four-thread caps.  These checks do
-not establish LightGBM score parity with Kaggle.  No Test predictions,
-submission, calibration, or upload was produced during migration.
+not establish byte-for-byte LightGBM score parity with Kaggle.  No Test
+predictions, submission, calibration, or upload was produced during the
+rebuild.
+
+The matched A/B/C result is decisive for the current diagnosis: on the same
+109,439-row Dec-2014 replay, late D0 (A) is `0.789549` official weighted RMSE,
+full B3 with the legal sparse view (B) is `0.737579`, and full B3 with the
+retrospective dense view (C) is exactly equal to B.  Replay identity is exact,
+exposure counts are explicit, and additive cell-SSE checks pass to
+`1.82e-12`.  This rules out dense-versus-sparse covariate availability as the
+primary cause in this paired test; A-to-B remains a joint later-training-
+exposure/fitted-model comparison, so the actionable hypothesis is still late
+temporal transfer plus validation-support mismatch.  Full details are in
+`LEADERBOARD_ROOT_CAUSE_REPORT.md` and the remote run directory.
 
 ## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
 

@@ -4,15 +4,24 @@
 
 Execution has moved to the persistent CPU-only VM reached with `ssh zindi-gcp`.
 Use `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at
-`32e506b2412e62400933ef06496fe191b3184163`; run long jobs only in tmux session
+`09d52e3`; run long jobs only in tmux session
 `zindi` and keep its `script -af /home/milli/zindi-session.log` logger alive.
 The authoritative Train/Test/SampleSubmission files are hash-matched on the VM,
 and surviving fold archives are recorded in `RECOVERY_MATRIX_20260910.md`.
 The exact full B3 model, Dec-2014 D0 replay package, and matched A/B/C directory
-remain unavailable after the Kaggle restart.  Historical paths and metrics are
-not current artifacts; do not substitute an outer-fold model or claim the
-matched diagnosis complete without exact recovery or an explicitly authorized
-VM rebuild.  See `GCP_MIGRATION_RUNBOOK.md` for the environment and resume gate.
+were rebuilt on GCP and remain remote for inspection; do not copy the large
+artifacts to Windows.  See `GCP_MIGRATION_RUNBOOK.md` for the environment and
+resume gate.
+
+The current matched replay is complete.  On the same 109,439-row legal replay,
+the late D0 model (A) scores `0.789549` official h1--7 weighted RMSE, while
+the full B3 model under the sparse legal view (B) scores `0.737579`; the
+retrospective dense view (C) is exactly identical to B.  A reproduces its
+saved OOF within `4.44e-16`, exposure counts are recorded, and corrected cell
+SSE aggregation is conserved to `1.82e-12`.  The GCP booster is an environment-
+drift rebuild (LightGBM 4.7.0), not a byte-for-byte replacement for the
+historical Kaggle booster; row/label/weight hashes match the frozen contract.
+No Test labels, predictions, calibration, or submission were created.
 
 ## 2026-09-09 — leaderboard root-cause investigation complete
 
