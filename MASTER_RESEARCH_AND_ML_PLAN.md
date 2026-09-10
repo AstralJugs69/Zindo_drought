@@ -29,8 +29,8 @@ predictions, submission, calibration, or upload was produced during the
 rebuild.
 
 The matched A/B/C result is decisive for the current diagnosis: on the same
-109,439-row Dec-2014 replay, late D0 (A) is `0.789549` official weighted RMSE,
-full B3 with the legal sparse view (B) is `0.737579`, and full B3 with the
+109,439-row Dec-2014 replay, late D0 (A) is `0.789549` Test-horizon-weighted
+validation proxy, full B3 with the legal sparse view (B) is `0.737579`, and full B3 with the
 retrospective dense view (C) is exactly equal to B.  Replay identity is exact,
 exposure counts are explicit, and additive cell-SSE checks pass to
 `1.82e-12`.  This rules out dense-versus-sparse covariate availability as the
@@ -66,6 +66,39 @@ transfer hypothesis; do not launch a larger capacity grid or create Test
 predictions/submissions.  Full tables, hashes, and remote paths are in
 `CAPACITY_BOTTLENECK_RESULTS.md` and
 `/home/milli/zindi_drought_gcp/drought_runs/gcp_b3_capacity_20260910/`.
+
+## 2026-09-10 — spatial/reversal diagnosis and bounded next hypothesis
+
+The Train-only canonical location/calendar table and saved B3/98 OOF attribution
+are in
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_late2015_spatial_reversal_20260910_v10/`
+and summarized in `SPATIAL_REVERSAL_DIAGNOSTIC_RESULTS.md`.  The exact target
+identity is zero-difference on 1,977,398 next-calendar matches; 176,623 rows
+without an exact next source month are excluded from reversal joins.  No Test
+rows, model fits, predictions, submissions, or uploads were produced.
+
+The late-2015 change is broad-field and reversing.  January/February/June 2015
+`d_t` RMSE is 1.012/1.189/1.182 versus 0.504/0.524/0.542 in matched early
+controls.  Fixed eight-neighbour correlations are 0.991/0.987/0.997 and
+5-degree cell means explain 83.0%/69.1%/92.7% of SSE.  Exact-calendar reversal
+correlations are −0.381/−0.719/−0.700 for Jan→Feb, Feb→Mar, and Jun→Jul,
+with high-delta opposite-sign fractions 0.650/0.875/0.907 under thresholds
+estimated only from 2009–2013.  On the Dec-2014 replay, q90+ delta rows carry
+71–73% of error SSE in the three suspicious months; focal anchor ages progress
+from one to 2–3 to 4–6 months.
+
+The 446-column B3 schema has focal `last_observed_TWS`/`h` and hydro-only
+regional context, but no neighboring TWS state or neighbor observation date.
+The existing mask-block ledger supplies a legal source-date neighbor state on
+99.91% of April/December OOF rows (eight neighbours at the median), and that
+state differs from the focal anchor on essentially every supported event.  This
+supports exactly one next experiment: keep B3/98 fixed and add the legal
+neighbor mean, mean-minus-focal residual, support count, and median neighbor
+anchor age.  Generate these only from visible observations at or before each
+source month; leave unsupported values missing; do not use target-time state.
+Use the fixed two-origin inner paired screen and recent-origin stop gate in the
+diagnostic report, and stop after one failed gate.  This intervention is
+specified but not launched.
 
 ## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
 

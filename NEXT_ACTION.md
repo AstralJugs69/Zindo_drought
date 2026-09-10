@@ -14,7 +14,7 @@ artifacts to Windows.  See `GCP_MIGRATION_RUNBOOK.md` for the environment and
 resume gate.
 
 The current matched replay is complete.  On the same 109,439-row legal replay,
-the late D0 model (A) scores `0.789549` official h1--7 weighted RMSE, while
+the late D0 model (A) scores `0.789549` Test-horizon-weighted validation proxy, while
 the full B3 model under the sparse legal view (B) scores `0.737579`; the
 retrospective dense view (C) is exactly identical to B.  A reproduces its
 saved OOF within `4.44e-16`, exposure counts are recorded, and corrected cell
@@ -36,8 +36,8 @@ The Train-only B3 comparison ran on `zindi-gcp` in tmux at commit
 63-leaf, `min_data_in_leaf=1000` recipe fit once to 392 rounds and scored
 checkpoints 98 and 392 on identical paired rows.  At 2014-04, raw h1--7 RMSE
 improved `0.581798 -> 0.567687` (h=4 is absent and was not imputed).  At the
-complete 2014-12 origin it worsened `0.809378 -> 0.814031`; official weighted
-RMSE worsened `0.789549 -> 0.791794`.  No recent month with at least 1,000
+complete 2014-12 origin it worsened `0.809378 -> 0.814031`; the complete
+Test-horizon-weighted validation proxy worsened `0.789549 -> 0.791794`.  No recent month with at least 1,000
 rows exceeded the `+0.02` regression guardrail, but both origins had to
 improve, so `recent_gate_pass=false` and the optional 2009-01 transfer check
 was not run.
@@ -51,6 +51,42 @@ Future GCP LightGBM work now uses a 12-thread baseline, with 24 or 48 threads
 available only for an explicitly authorized isolated benchmark after checking
 RSS headroom.  The capacity run itself remains the pre-change four-thread
 measurement because it was not interrupted.
+
+## 2026-09-10 — late-2015 spatial/reversal diagnostic
+
+The Train-only diagnostic is complete on `zindi-gcp` in
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_late2015_spatial_reversal_20260910_v10`
+from commit `c3575fb119751ef0925d748081b82ec743684efa`.  It read no Test data,
+fit no model, and wrote no predictions or submission.  The exact-calendar
+target identity holds on 1,977,398 rows with zero difference; 176,623
+terminal/missing-next-month rows were excluded rather than bridged.
+
+The failure is spatially coherent and temporally reversing: `d_t` RMSE is
+1.012/1.189/1.182 in 2015-01/02/06 versus 0.504/0.524/0.542 in matched early
+controls, while nearest-neighbour correlations remain 0.991/0.987/0.997 and
+5-degree cell means explain 83.0%/69.1%/92.7% of d SSE.  Same-location
+calendar controls have 1.130–1.426, 1.339–1.371, and 1.366–1.427 difference
+RMSE for January/February/June.  Reversal becomes stronger in the suspicious
+months, and historical-q90+ deltas account for 71–73% of Dec-replay error SSE.
+
+The frozen 446-feature B3 schema contains focal `last_observed_TWS` and `h`,
+300 hydro-only regional features, and no neighboring TWS state/date.  Under the
+existing mask-block replay ledger, legal source-date neighbor state has 99.91%
+support, median eight neighbors, and differs from the focal anchor on ~100% of
+supported events.  This is a non-empty candidate, not evidence that the prior
+zero-withholding B/C control was informative.
+
+**Next action:** specify, but do not launch, one fixed B3/98 intervention adding
+the legal eight-neighbour mean, mean-minus-focal residual, support count, and
+median neighbor-anchor age.  Keep exact-calendar visibility, missing support,
+paired 2003-04/2004-04 inner selection, and the predeclared two-recent-origin
+stop gate described in `SPATIAL_REVERSAL_DIAGNOSTIC_RESULTS.md`.  Do not create
+Test predictions or a submission without separate authorization.
+
+The diagnostic ran in 144.07 s at the 12-thread baseline, with 1.87 GiB peak
+RSS and no swap.  The fixed cached inference benchmark supports explicit 24/48
+thread escalation (median 0.1817/0.1201/0.0772 s at 12/24/48) but leaves 12 as
+the safe default and forbids concurrent high-thread jobs.
 
 ## 2026-09-09 — leaderboard root-cause investigation complete
 

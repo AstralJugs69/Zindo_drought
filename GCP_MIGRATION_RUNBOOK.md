@@ -105,7 +105,7 @@ run two high-thread jobs concurrently.
 
 The frozen parity and matched diagnostic are complete.  Their key result is
 documented in `LEADERBOARD_ROOT_CAUSE_REPORT.md`: on the same 109,439-row
-replay, A/D0 scores `0.789549` official weighted RMSE while B/full-B3 scores
+replay, A/D0 scores `0.789549` Test-horizon-weighted validation proxy while B/full-B3 scores
 `0.737579`; C/dense is exactly equal to B.  Cell-SSE aggregation is conserved
 to `1.82e-12`.  The B/C intervention is an empty no-withholding control
 (`sparse_withheld_window_rows=0`, zero changed features), so it must not be
@@ -115,6 +115,6 @@ comparison is complete and failed its recent-origin gate; keep future work
 Train-only unless a separate authorization says otherwise.
 
 The Train-only B3 runner accepts a bounded `--num-threads` value from 1 through
-24 and now defaults to 12.  Use 24 only for an explicitly authorized
+48 and now defaults to 12.  Use 24 or 48 only for an explicitly authorized
 higher-throughput run; the thread count is recorded in each manifest/config so
 comparisons remain auditable.
