@@ -558,7 +558,7 @@ def replay_neighbor_support(
     focal = rows["last_observed_TWS"].to_numpy(dtype=np.float64)
     anchor_mismatch = float(np.max(np.abs(focal - tws[loc]))) if len(rows) else 0.0
     differs = supported & np.isfinite(focal) & (np.abs(mean - focal) > 1e-6)
-    dists = neighbor_distances[neighbor_index[loc] >= 0]
+    dists = neighbor_distances[loc][neighbor_index[loc] >= 0]
     return {
         "origin": origin,
         "state_kind": "LEGAL_SOURCE_DATE_TWS_NEIGHBOR_DIAGNOSTIC",
