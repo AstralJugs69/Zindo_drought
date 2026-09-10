@@ -822,6 +822,9 @@ def main() -> None:
             oof_frames.append(joined.loc[:, ["sample_id", "origin", "source_date_oof", "target_date", "last_observed_date", "last_observed_TWS", "h", "lat_oof", "lon_oof", "target", "prediction", "source_ord", "location_id", "d"]].rename(columns={"source_date_oof": "source_date", "lat_oof": "lat", "lon_oof": "lon"}))
         oof_all = pd.concat(oof_frames, ignore_index=True)
         q90 = thresholds["q90"]
+        oof_all["source_month"] = month_label(oof_all["source_date"])
+        oof_all["error"] = oof_all["prediction"].to_numpy(dtype=np.float64) - oof_all["target"].to_numpy(dtype=np.float64)
+        oof_all["anchor_age_months"] = oof_all["source_ord"].to_numpy(dtype=np.int32) - month_ordinal(oof_all["last_observed_date"])
         metric_table, oof_spatial, oof_extreme, oof_age = oof_metric_tables(oof_all, historical_delta_q90=q90)
         metric_table.to_csv(output_dir / "oof_error_metrics.csv", index=False)
         oof_spatial.to_csv(output_dir / "oof_spatial_attribution.csv", index=False)
