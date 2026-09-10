@@ -9,6 +9,24 @@
 records are retained as legacy references only; no candidate is currently promoted
 under the corrected multi-scenario protocol.
 
+## 2026-09-10 — execution host migrated to persistent GCP VM
+
+The active execution host is now the persistent CPU-only VM reached with
+`ssh zindi-gcp`, not Kaggle/Pinggy.  The user-owned checkout is
+`/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at commit
+`32e506b2412e62400933ef06496fe191b3184163`.  Long-running work must run in
+tmux session `zindi`, whose shell is logged with
+`script -af /home/milli/zindi-session.log`; see `GCP_MIGRATION_RUNBOOK.md`.
+
+Train/Test/SampleSubmission are present on the VM and match the recorded
+SHA-256 values.  Surviving fold archives are under
+`/home/milli/zindi_drought_gcp/recovered_archives/`; exact full-B3, Dec-2014
+D0, and matched A/B/C artifacts remain unavailable after the Kaggle restart.
+The VM environment is isolated and recorded in `environment.lock.txt`; the
+non-training test suite passed 56 tests with four-thread caps.  These checks do
+not establish LightGBM score parity with Kaggle.  No Test predictions,
+submission, calibration, or upload was produced during migration.
+
 ## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
 
 The frozen dense-history B3/98 public score is `0.750207364`. A read-only

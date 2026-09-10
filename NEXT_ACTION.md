@@ -1,15 +1,18 @@
 # Next action — B3/98 full submission result recorded
 
-## Current runtime state — 2026-09-09
+## Current runtime state — 2026-09-10
 
-The Pinggy supervisor is reachable through `ssh kaggle` at the current
-generation, and the checkout is clean at commit `9fb9a5d`.  A live inventory
-after the runtime restart found `/kaggle/working/drought_runs/`, but did **not**
-find the saved full B3 model, the Dec-2014 D0 replay package, or the interrupted
-matched-comparison directory referenced below.  Those paths and metrics are
-historical evidence, not proof that the artifacts survived this restart.  Do
-not substitute an outer-fold model or retrain solely to recreate them; restore
-the exact saved artifacts before claiming the matched A/B/C diagnosis complete.
+Execution has moved to the persistent CPU-only VM reached with `ssh zindi-gcp`.
+Use `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at
+`32e506b2412e62400933ef06496fe191b3184163`; run long jobs only in tmux session
+`zindi` and keep its `script -af /home/milli/zindi-session.log` logger alive.
+The authoritative Train/Test/SampleSubmission files are hash-matched on the VM,
+and surviving fold archives are recorded in `RECOVERY_MATRIX_20260910.md`.
+The exact full B3 model, Dec-2014 D0 replay package, and matched A/B/C directory
+remain unavailable after the Kaggle restart.  Historical paths and metrics are
+not current artifacts; do not substitute an outer-fold model or claim the
+matched diagnosis complete without exact recovery or an explicitly authorized
+VM rebuild.  See `GCP_MIGRATION_RUNBOOK.md` for the environment and resume gate.
 
 ## 2026-09-09 — leaderboard root-cause investigation complete
 
