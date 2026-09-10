@@ -30,9 +30,10 @@ CPU-only; no GPU/neural campaign is planned.
 
 The VM reported Ubuntu 22.04, 48 vCPUs, about 62 GiB RAM, and about 192 GiB
 free on the 194 GiB root disk.  The checkout is on
-`codex/validation-rebuild` at `09d52e3` after the diagnostic runner's schema
-persistence fix, with no tracked changes.  The completed recovery diagnostics
-were launched at the preceding clean commit `7e44744739065dfd6bf7a5e53ae3af28b3b79450`.
+`codex/validation-rebuild` at `71d7e89` after the diagnostic runner's schema
+persistence and report updates, with no tracked changes.  The completed
+recovery diagnostics were launched at the preceding clean commit
+`7e44744739065dfd6bf7a5e53ae3af28b3b79450`.
 
 The environment is intentionally isolated.  Exact observed versions are kept
 in `/home/milli/zindi_drought_gcp/environment.lock.txt`:
@@ -47,7 +48,7 @@ pytest 9.1.1
 ```
 
 The repository test suite was run in tmux with the four-thread caps and passed
-`56 passed in 6.51s`.  This is a non-training parity check, not model-score
+`56 passed in 5.07s`.  This is a non-training parity check, not model-score
 parity; package/hardware differences from historical Kaggle runs remain.
 
 ## Authoritative inputs and recovery

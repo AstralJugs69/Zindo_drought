@@ -14,7 +14,7 @@ candidate is promoted under the corrected multi-scenario protocol.
 The active execution host is now the persistent CPU-only VM reached with
 `ssh zindi-gcp`, not Kaggle/Pinggy.  The user-owned checkout is
 `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at commit
-`09d52e3`.  Long-running work must run in
+`71d7e89`.  Long-running work must run in
 tmux session `zindi`, whose shell is logged with
 `script -af /home/milli/zindi-session.log`; see `GCP_MIGRATION_RUNBOOK.md`.
 

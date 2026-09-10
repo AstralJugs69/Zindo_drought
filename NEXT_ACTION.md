@@ -4,7 +4,7 @@
 
 Execution has moved to the persistent CPU-only VM reached with `ssh zindi-gcp`.
 Use `/home/milli/zindi_drought_gcp` on `codex/validation-rebuild` at
-`09d52e3`; run long jobs only in tmux session
+`71d7e89`; run long jobs only in tmux session
 `zindi` and keep its `script -af /home/milli/zindi-session.log` logger alive.
 The authoritative Train/Test/SampleSubmission files are hash-matched on the VM,
 and surviving fold archives are recorded in `RECOVERY_MATRIX_20260910.md`.
