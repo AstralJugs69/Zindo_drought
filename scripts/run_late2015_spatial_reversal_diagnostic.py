@@ -473,6 +473,18 @@ def oof_metric_tables(
                     "h_gt7": sub.loc[sub["h"] > 7],
                 }.items():
                     age_rows.append({"origin": origin, "source_month": source_month, "scope": scope, "anchor_age_bin": str(age), **metric_sums(scoped["error"].to_numpy())})
+        # The official-style horizon proxy is defined only after pooling all
+        # source months for an origin.  Sparse source-month slices often lack one
+        # or more h=1..7 strata, so those slices correctly remain incomplete.
+        pooled_proxy = weighted_proxy(origin_frame)
+        pooled_h17 = origin_frame.loc[origin_frame["h"].between(1, 7)]
+        metric_rows.append({
+            "origin": origin, "source_month": "ALL_SOURCE_MONTHS",
+            "scope": "weighted_h1_7_proxy", **metric_sums(pooled_h17["error"]),
+            "weighted_rmse_proxy": pooled_proxy["weighted_rmse_proxy"],
+            "weighted_complete": bool(pooled_proxy["weighted_complete"]),
+            "weighted_missing_horizons": ",".join(map(str, pooled_proxy["weighted_missing_horizons"])),
+        })
     return pd.DataFrame(metric_rows), pd.DataFrame(spatial_rows), pd.DataFrame(extreme_rows), pd.DataFrame(age_rows)
 
 
