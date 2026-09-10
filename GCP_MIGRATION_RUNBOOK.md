@@ -99,9 +99,9 @@ logs, exit status, timing, and peak RSS.  Keep target-blind feature caches
 keyed by input/code/recipe/schema/cutoff/availability fingerprints; never mix a
 dense/sparse/Test view.  Run at most two folds concurrently only after checking
 the memory estimate and retaining a 12 GiB reserve.  Start with 12 threads;
-increase to 24 only for an explicitly authorized isolated run after checking
-feature construction, fitting, inference, and RSS headroom.  Do not run two
-high-thread jobs concurrently.
+increase to 24 or 48 only for an explicitly authorized isolated run after
+checking feature construction, fitting, inference, and RSS headroom.  Do not
+run two high-thread jobs concurrently.
 
 The frozen parity and matched diagnostic are complete.  Their key result is
 documented in `LEADERBOARD_ROOT_CAUSE_REPORT.md`: on the same 109,439-row

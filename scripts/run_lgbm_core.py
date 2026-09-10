@@ -43,7 +43,7 @@ from src.validation import build_direct_horizon_fold, recent_observed_month_bloc
 
 
 DEFAULT_NUM_THREADS = 12
-MAX_NUM_THREADS = 24
+MAX_NUM_THREADS = 48
 
 DEFAULT_PARAMS = {
     "objective": "regression",

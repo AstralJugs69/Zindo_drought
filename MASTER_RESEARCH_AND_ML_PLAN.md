@@ -44,9 +44,10 @@ Full details are in
 `LEADERBOARD_ROOT_CAUSE_REPORT.md` and the remote run directory.
 
 The persistent VM has 48 vCPUs.  The default LightGBM execution policy is now
-12 threads, with 24 as an explicitly authorized upper benchmark; effective
-values are recorded in each manifest.  Do not run two high-thread jobs
-concurrently, and keep the persistent `zindi` tmux/logger path intact.
+12 threads, with 24 or 48 available only as explicitly authorized isolated
+benchmarks; effective values are recorded in each manifest.  Do not run two
+high-thread jobs concurrently, and keep the persistent `zindi` tmux/logger path
+intact.
 
 ## 2026-09-10 — capacity bottleneck decision
 

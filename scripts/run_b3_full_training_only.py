@@ -43,7 +43,7 @@ ROUNDS = 98
 NUM_LEAVES = 63
 MIN_DATA_IN_LEAF = 1000
 DEFAULT_NUM_THREADS = 12
-MAX_NUM_THREADS = 24
+MAX_NUM_THREADS = 48
 TRAIN_COLUMNS = [
     "sample_id", "time", "lat", "lon", "TWS_t", "month_sin", "month_cos",
     *HYDRO_COLUMNS, "target",

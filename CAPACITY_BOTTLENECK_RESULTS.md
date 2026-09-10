@@ -42,8 +42,9 @@ the manifest's RSS tracker is unavailable; read-only process spot checks saw
 RSS below roughly 22 GiB and ample VM headroom.
 
 For future executions, the repository defaults now use a **12-thread baseline**
-and allow explicitly authorized escalation to 24 threads.  The already-running
-comparison was left uninterrupted and remains a valid fixed-recipe result.
+and allow explicitly authorized escalation to 24 or 48 threads.  The
+already-running comparison was left uninterrupted and remains a valid
+fixed-recipe result.
 
 The intervention was only:
 
@@ -195,4 +196,3 @@ Checkpoint model and OOF hashes are recorded in the same directory's
 `origin_*_details.json` files.  There are no files whose names indicate Test
 predictions or submissions, and the manifest records `status=completed`,
 `submission_written=false`, `test_rows_read=0`, and `test_labels_read=false`.
-

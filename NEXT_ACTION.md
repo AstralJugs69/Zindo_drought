@@ -47,9 +47,10 @@ B3/98 as the development control.  Continue with representation/data-transfer
 diagnostics only if a separately authorized hypothesis is supplied; do not
 launch a larger capacity grid or create Test predictions/submissions.
 
-Future GCP LightGBM work now uses a 12-thread baseline, with 24 threads as an
-explicitly authorized upper benchmark.  The capacity run itself remains the
-pre-change four-thread measurement because it was not interrupted.
+Future GCP LightGBM work now uses a 12-thread baseline, with 24 or 48 threads
+available only for an explicitly authorized isolated benchmark after checking
+RSS headroom.  The capacity run itself remains the pre-change four-thread
+measurement because it was not interrupted.
 
 ## 2026-09-09 — leaderboard root-cause investigation complete
 
