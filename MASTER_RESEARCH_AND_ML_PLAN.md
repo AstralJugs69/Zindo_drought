@@ -39,6 +39,12 @@ exposure/fitted-model comparison, so the actionable hypothesis is still late
 temporal transfer plus validation-support mismatch.  Full details are in
 `LEADERBOARD_ROOT_CAUSE_REPORT.md` and the remote run directory.
 
+The persistent VM has 48 vCPUs.  Reproducibility runs remain capped at four
+threads; the Train-only runner exposes a bounded `--num-threads 1..24` option
+for separately authorized 12/24-thread benchmarks, with the effective value
+recorded in each manifest.  No current diagnostic was rerun at a higher
+thread count.
+
 ## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
 
 The frozen dense-history B3/98 public score is `0.750207364`. A read-only

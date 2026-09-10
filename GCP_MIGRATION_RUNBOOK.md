@@ -106,3 +106,9 @@ replay, A/D0 scores `0.789549` official weighted RMSE while B/full-B3 scores
 to `1.82e-12`.  This does not authorize the one recommended next experiment:
 a late-prefix, Test-schedule-matched recency-weighted B3/98 fit.  Keep that
 experiment gated behind explicit authorization and do not create Test outputs.
+
+The Train-only B3 runner preserves the four-thread default and now accepts a
+bounded `--num-threads` value from 1 through 24.  On this 48-vCPU VM, benchmark
+12 and 24 in separate, explicitly authorized runs before changing the default;
+the thread count is recorded in each manifest/config so comparisons remain
+auditable.

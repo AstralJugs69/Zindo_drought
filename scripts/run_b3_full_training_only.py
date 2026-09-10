@@ -42,6 +42,8 @@ SEED = 20260908
 ROUNDS = 98
 NUM_LEAVES = 63
 MIN_DATA_IN_LEAF = 1000
+DEFAULT_NUM_THREADS = 4
+MAX_NUM_THREADS = 24
 TRAIN_COLUMNS = [
     "sample_id", "time", "lat", "lon", "TWS_t", "month_sin", "month_cos",
     *HYDRO_COLUMNS, "target",
@@ -109,9 +111,19 @@ def main() -> None:
     parser.add_argument("--expected-commit", required=True)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--rounds", type=int, default=ROUNDS)
+    parser.add_argument(
+        "--num-threads",
+        type=int,
+        default=DEFAULT_NUM_THREADS,
+        help=f"LightGBM threads (default {DEFAULT_NUM_THREADS}; bounded to {MAX_NUM_THREADS} for safe VM benchmarks)",
+    )
     args = parser.parse_args()
     if args.seed != SEED or args.rounds != ROUNDS:
         raise ValueError(f"Frozen B3/98 recipe requires seed={SEED} and rounds={ROUNDS}")
+    available_cpus = os.cpu_count() or 1
+    if args.num_threads < 1 or args.num_threads > MAX_NUM_THREADS:
+        raise ValueError(f"--num-threads must be in [1, {MAX_NUM_THREADS}]")
+    num_threads = min(int(args.num_threads), available_cpus)
 
     import lightgbm as lgb
 
@@ -138,6 +150,8 @@ def main() -> None:
         "rounds": ROUNDS,
         "num_leaves": NUM_LEAVES,
         "min_data_in_leaf": MIN_DATA_IN_LEAF,
+        "requested_num_threads": int(args.num_threads),
+        "num_threads": num_threads,
         "no_test_predictions": True,
         "test_rows_read": 0,
         "test_labels_read": False,
@@ -198,7 +212,7 @@ def main() -> None:
                           "missing_values_allowed": True, "schema_sha256": _hash_text(feature_names)}
         _json(output_dir / "feature_schema.json", feature_schema)
         params = dict(DEFAULT_PARAMS, num_leaves=NUM_LEAVES, min_data_in_leaf=MIN_DATA_IN_LEAF,
-                      num_threads=min(4, os.cpu_count() or 1), seed=SEED, feature_fraction_seed=SEED,
+                      num_threads=num_threads, seed=SEED, feature_fraction_seed=SEED,
                       bagging_seed=SEED, data_random_seed=SEED)
         _json(output_dir / "resolved_config.json", {"model": "B3_dense_history_delta_lightgbm_training_only",
               "params": params, "feature_schema": feature_schema, "training": training_info,
