@@ -76,12 +76,23 @@ support, median eight neighbors, and differs from the focal anchor on ~100% of
 supported events.  This is a non-empty candidate, not evidence that the prior
 zero-withholding B/C control was informative.
 
-**Next action:** specify, but do not launch, one fixed B3/98 intervention adding
-the legal eight-neighbour mean, mean-minus-focal residual, support count, and
-median neighbor-anchor age.  Keep exact-calendar visibility, missing support,
-paired 2003-04/2004-04 inner selection, and the predeclared two-recent-origin
-stop gate described in `SPATIAL_REVERSAL_DIAGNOSTIC_RESULTS.md`.  Do not create
-Test predictions or a submission without separate authorization.
+The specified intervention was then run exactly once as the gated
+`NEIGHBOR_STATE_B3_RESULTS.md` experiment.  It added the legal eight-neighbour
+mean, mean-minus-focal residual, support count, and median neighbor-anchor age
+to frozen B3/98.  The two-origin inner screen passed (`+0.000680` and
+`+0.002900` raw h1--7 RMSE gains), but the recent gate failed: 2014-04
+regressed by `0.001061` while 2014-12 improved by `0.002575` (weighted proxy
+`0.789549 -> 0.788071`).  April has no h=4 support and was evaluated with
+present h1--7 rows; no weighted proxy was invented.  No source month with at
+least 1,000 rows exceeded the `+0.02` regression guardrail, but both recent
+origins had to improve, so the optional 2009-01 transfer check was not run.
+
+**Decision:** reject the neighbor-state augmentation as a replacement and
+retain dense B3/98.  Keep the remote models/OOF and prefit checks as audit
+evidence; do not sweep additional neighbor features or create Test predictions
+or a submission without separate authorization.  Full paths, hashes,
+coverage, resource measurements, and per-horizon/source-month tables are in
+`NEIGHBOR_STATE_B3_RESULTS.md`.
 
 The diagnostic ran in 144.07 s at the 12-thread baseline, with 1.87 GiB peak
 RSS and no swap.  The fixed cached inference benchmark supports explicit 24/48

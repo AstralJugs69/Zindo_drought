@@ -92,13 +92,44 @@ regional context, but no neighboring TWS state or neighbor observation date.
 The existing mask-block ledger supplies a legal source-date neighbor state on
 99.91% of April/December OOF rows (eight neighbours at the median), and that
 state differs from the focal anchor on essentially every supported event.  This
-supports exactly one next experiment: keep B3/98 fixed and add the legal
+motivated one fixed intervention: keep B3/98 unchanged and add the legal
 neighbor mean, mean-minus-focal residual, support count, and median neighbor
-anchor age.  Generate these only from visible observations at or before each
-source month; leave unsupported values missing; do not use target-time state.
-Use the fixed two-origin inner paired screen and recent-origin stop gate in the
-diagnostic report, and stop after one failed gate.  This intervention is
-specified but not launched.
+anchor age.  These were generated only from visible observations at or before
+each event's focal last-observed date; unsupported values stayed missing and
+target-time state was not used.  The resulting run and gate are recorded in
+the section immediately below and in `NEIGHBOR_STATE_B3_RESULTS.md`.
+
+## 2026-09-10 — legal neighbor-state B3/98 intervention rejected
+
+The Train-only run completed on `zindi-gcp` in
+`/home/milli/zindi_drought_gcp/drought_runs/gcp_neighbor_state_b3_20260910_v1`
+from commit `fb12f744dbcb3db58ea84e5d76faae6fd3349001`.  It used the fixed
+12-thread baseline, 98 rounds, 63 leaves, and `min_data_in_leaf=1000`; C0 kept
+446 features and C1 added exactly four neighbor-state features.  All prefit
+causality checks passed, including target/future/masked perturbation
+invariance, missing-month handling, self-exclusion, longitude wrapping, and
+zero observation-date cutoff violations.  Neighbor support was approximately
+99.91% with eight neighbors at the median.
+
+The paired inner screen improved raw h1--7 RMSE on both origins: 2003-04
+`0.580719 -> 0.580039` (gain `+0.000680`) and 2004-04
+`0.560776 -> 0.557876` (gain `+0.002900`).  The recent gate then failed its
+predeclared requirement that both origins improve: 2014-04 regressed
+`0.581798 -> 0.582860` (delta `+0.001061`, with no h=4 support), while
+2014-12 improved `0.809378 -> 0.806802` (gain `+0.002575`; weighted proxy
+`0.789549 -> 0.788071`).  No source month with at least 1,000 rows exceeded
+the `+0.02` regression guardrail.  The optional 2009-01 transfer check was
+not run because `outer_gate.pass=false`.
+
+**Decision:** reject the neighbor-state augmentation as a deployment or
+training replacement and retain dense B3/98.  Preserve the remote models,
+OOF ledgers, and tables as audit evidence; do not create Test predictions,
+submissions, or a broader neighbor sweep from this result.  The run completed
+with exit status 0 in 24:48.45 wall time, maximum resident set about 25.34 GiB,
+and zero swap.  The runner's optional `psutil` sampler was unavailable, so
+external `/usr/bin/time -v` values are the resource record.  Test geometry was
+read only for `ID,time,lat,lon,TWS_t,TWS_t_masked`; no Test labels or
+predictions were read or written.
 
 ## 2026-09-09 — public B3 gap: measured root cause and one gated follow-up
 
