@@ -552,7 +552,7 @@ def replay_neighbor_support(
     count = np.isfinite(values).sum(axis=1)
     mean = np.divide(np.nansum(values, axis=1), count, out=np.full(len(rows), np.nan), where=count >= MIN_NEIGHBORS)
     source_ord = rows["source_ord"].to_numpy(dtype=np.int32)
-    ages = source_ord[:, None] - anchor_ord[safe]
+    ages = (source_ord[:, None] - anchor_ord[safe]).astype(np.float64)
     ages[(neighbor_index[loc] < 0) | ~np.isfinite(values)] = np.nan
     supported = count >= MIN_NEIGHBORS
     focal = rows["last_observed_TWS"].to_numpy(dtype=np.float64)
