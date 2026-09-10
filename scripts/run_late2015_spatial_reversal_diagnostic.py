@@ -582,9 +582,9 @@ def replay_neighbor_support(
     }
 
 
-def write_event(path: Path, phase: str, **payload: Any) -> None:
+def write_event(event_path: Path, phase: str, **payload: Any) -> None:
     record = {"timestamp": datetime.now(timezone.utc).isoformat(), "phase": phase, **payload}
-    with path.open("a", encoding="utf-8") as handle:
+    with event_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(_json_safe(record), sort_keys=True) + "\n")
 
 
