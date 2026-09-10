@@ -834,6 +834,13 @@ def main() -> None:
                 _atomic_json(args.output_dir / "outer_gate.json", outer_gate)
                 _atomic_json(args.output_dir / "transfer_gate.json", transfer_gate)
 
+            # The inner gate can pass while the recent outer gate fails.  Keep
+            # the declared transfer artifact durable in that branch too, so a
+            # completed run never advertises a file that was not written.
+            transfer_path = args.output_dir / "transfer_gate.json"
+            if not transfer_path.is_file():
+                _atomic_json(transfer_path, transfer_gate)
+
             validation_long = pd.concat(all_oofs, ignore_index=True)
             fit_metrics = pd.concat(all_fit_metrics, ignore_index=True)
             validation_by_month = _aggregate(validation_long, ["source_month"])
