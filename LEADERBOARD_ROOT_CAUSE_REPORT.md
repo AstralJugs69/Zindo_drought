@@ -400,7 +400,19 @@ not assume that the public labels can be reconstructed.
 
 ## Artifact index and reproducibility
 
-Completed compact outputs remain remote and are inspectable with `ssh kaggle`:
+Current GCP compact outputs remain remote and are inspectable with
+`ssh zindi-gcp`:
+
+- `/home/milli/zindi_drought_gcp/drought_runs/gcp_d0_b3_parity_20260910/` —
+  frozen Sep-2007 parity manifest.
+- `/home/milli/zindi_drought_gcp/drought_runs/gcp_d0_dec2014_20260910/` —
+  rebuilt late D0 model/OOF package.
+- `/home/milli/zindi_drought_gcp/drought_runs/gcp_full_b3_train_only_20260910/` —
+  Train-only full B3 model, schema, and manifest.
+- `/home/milli/zindi_drought_gcp/drought_runs/gcp_matched_comparison_20260910_v2/` —
+  matched A/B/C details and compact tables.
+
+Historical compact outputs remain remote and are inspectable with `ssh kaggle`:
 
 - `/kaggle/working/drought_runs/leaderboard_failure_20260909T123000Z/` —
   integrity, exact alignment, target behaviour, cell concentration, OOF
