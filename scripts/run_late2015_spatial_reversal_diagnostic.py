@@ -278,7 +278,7 @@ def spatial_month_metrics(
     n_locations: int,
     neighbor_index: np.ndarray,
     neighbor_distances: np.ndarray,
-) -> tuple[dict[str, Any], pd.DataFrame]:
+) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFrame]:
     values = frame["d"].to_numpy(dtype=np.float64)
     loc = frame["location_id"].to_numpy(dtype=np.int64)
     means, counts, _ = neighbor_state_for_rows(
@@ -336,7 +336,13 @@ def spatial_month_metrics(
         .reindex(cell_summary["cell_id"])
         .to_numpy()
     )
-    return result, cell_summary
+    row_summary = frame.loc[:, ["source_month", "location_id", "lat", "lon", "d"]].copy()
+    row_summary["neighbor_mean_d"] = means
+    row_summary["neighbor_count"] = counts
+    row_summary["neighbor_supported"] = np.isfinite(means)
+    row_summary["spatial_roughness"] = values - means
+    row_summary["oracle_diagnostic"] = True
+    return result, cell_summary, row_summary
 
 
 def build_exact_calendar_reversal(canonical: pd.DataFrame) -> pd.DataFrame:
@@ -577,6 +583,8 @@ def replay_neighbor_support(
         "source_visibility_rule": "all Train rows with source_month <= origin; rows after origin masked",
         "ledger_details_path": details.get("path"),
         "view_withheld_window_rows": details.get("feature_fingerprint", {}).get("view_withheld_window_rows"),
+        "replay_visible_source_rows": int((rows["source_ord"].to_numpy(dtype=np.int32) == origin_ord).sum()),
+        "replay_masked_source_rows": int((rows["source_ord"].to_numpy(dtype=np.int32) > origin_ord).sum()),
         "rows": int(len(rows)),
         "focal_anchor_max_abs_mismatch": anchor_mismatch,
         "neighbor_supported_rows": int(supported.sum()),
@@ -678,6 +686,7 @@ def main() -> None:
         train["source_ord"] = month_ordinal(train["source_date"])
         train["target_ord"] = train["source_ord"].to_numpy(dtype=np.int32) + 1
         train["source_month"] = month_label(train["source_date"])
+        train["target_month"] = train["target_ord"].map(ordinal_to_month)
         coords = train.loc[:, ["lat", "lon"]].drop_duplicates().sort_values(["lat", "lon"], kind="mergesort").reset_index(drop=True)
         coords["location_id"] = np.arange(len(coords), dtype=np.int32)
         train = train.merge(coords, on=["lat", "lon"], how="left", validate="many_to_one", sort=False)
@@ -715,7 +724,7 @@ def main() -> None:
         }
         atomic_json(output_dir / "exact_calendar_identity.json", identity_summary)
 
-        canonical_columns = ["source_month", "source_ord", "target_ord", "location_id", "lat", "lon", "TWS_t", "target", "d", "next_source_exists", "next_tws", "identity_abs_diff"]
+        canonical_columns = ["source_month", "target_month", "source_ord", "target_ord", "location_id", "lat", "lon", "TWS_t", "target", "d", "next_source_exists", "next_tws", "identity_abs_diff"]
         canonical_path = output_dir / "canonical_train_only.csv.gz"
         train.loc[:, canonical_columns].to_csv(canonical_path, index=False, compression="gzip")
         month_support = train.groupby("source_month", sort=True).agg(
@@ -746,12 +755,15 @@ def main() -> None:
         write_event(events_path, "spatial_start", locations=len(coords), months=int(train["source_ord"].nunique()), memory=read_memory())
         spatial_rows: list[dict[str, Any]] = []
         cell_frames: list[pd.DataFrame] = []
+        spatial_row_frames: list[pd.DataFrame] = []
         for month, group in train.groupby("source_month", sort=True):
-            result, cells = spatial_month_metrics(group, n_locations=len(coords), neighbor_index=neighbor_index, neighbor_distances=neighbor_distances)
+            result, cells, rows = spatial_month_metrics(group, n_locations=len(coords), neighbor_index=neighbor_index, neighbor_distances=neighbor_distances)
             spatial_rows.append(result)
             cell_frames.append(cells)
+            spatial_row_frames.append(rows)
         pd.DataFrame(spatial_rows).to_csv(output_dir / "spatial_month_metrics.csv", index=False)
         pd.concat(cell_frames, ignore_index=True).to_csv(output_dir / "spatial_cell_summary.csv", index=False)
+        pd.concat(spatial_row_frames, ignore_index=True).to_csv(output_dir / "spatial_row_metrics.csv.gz", index=False, compression="gzip")
         write_event(events_path, "spatial_complete", rows=len(spatial_rows), memory=read_memory())
 
         # Same-location, same-calendar-month paired controls.  No row shifting.
